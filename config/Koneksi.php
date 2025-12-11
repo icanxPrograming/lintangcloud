@@ -2,11 +2,8 @@
 
 namespace DB;
 
-require_once __DIR__ . '/../vendor/autoload.php';
-
 use PDO;
 use PDOException;
-use Dotenv\Dotenv;
 
 class Koneksi
 {
@@ -16,15 +13,12 @@ class Koneksi
   {
     if (self::$instance === null) {
 
-      // Load .env
-      // $dotenv = Dotenv::createImmutable(dirname(__DIR__));
-      // $dotenv->safeLoad(); // <-- ganti load() dengan safeLoad()
-
-      $host     = $_ENV['DB_HOST'];
-      $dbname   = $_ENV['DB_DATABASE'];
-      $username = $_ENV['DB_USERNAME'];
-      $password = $_ENV['DB_PASSWORD'];
-      $port     = $_ENV['DB_PORT'] ?? 3306;
+      // Ambil environment variable Railway / hosting
+      $host     = getenv('DB_HOST') ?: 'localhost';
+      $dbname   = getenv('DB_DATABASE') ?: 'test';
+      $username = getenv('DB_USERNAME') ?: 'root';
+      $password = getenv('DB_PASSWORD') ?: '';
+      $port     = getenv('DB_PORT') ?: 3306;
 
       try {
         self::$instance = new PDO(
