@@ -17,8 +17,8 @@ class Koneksi
     if (self::$instance === null) {
 
       // Load .env
-      $dotenv = Dotenv::createImmutable(dirname(__DIR__));
-      $dotenv->safeLoad(); // <-- ganti load() dengan safeLoad()
+      // $dotenv = Dotenv::createImmutable(dirname(__DIR__));
+      // $dotenv->safeLoad(); // <-- ganti load() dengan safeLoad()
 
       $host     = $_ENV['DB_HOST'];
       $dbname   = $_ENV['DB_DATABASE'];
