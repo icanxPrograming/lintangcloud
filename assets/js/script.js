@@ -1432,7 +1432,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (typeof refreshFileUI === "function") refreshFileUI();
             if (typeof refreshTrashUI === "function") refreshTrashUI();
 
-            showSuccess(`File "${file_name}" berhasil dipindahkan ke sampah!`);
+            showSuccess(`File berhasil dipindahkan ke sampah!`);
           } else {
             showError(
               "Gagal memindahkan file: " + (data.message || "Unknown error")
@@ -1935,292 +1935,192 @@ document.addEventListener("DOMContentLoaded", () => {
     trashTableBody.appendChild(tr);
   }
 
+  // ===================== GENERIC TRASH HANDLER =====================
+
+  // Refresh trash UI (table & grid)
   function refreshTrashUI() {
-    // Cek apakah elemen trashTableBody ada di halaman ini
-    if (!trashTableBody) {
-      console.log("ℹ️ trashTableBody tidak ditemukan di halaman ini");
-      return;
-    }
+    const trashTableBody = document.getElementById("trashTableBody");
+    const gridViewTrash = document.getElementById("gridViewTrash");
+    const noTrashFile = document.getElementById("noTrashFile");
 
-    if (trashTableBody.children.length === 0) {
+    if (trashTableBody && trashTableBody.children.length === 0) {
       if (noTrashFile) noTrashFile.style.display = "flex";
-    } else {
-      if (noTrashFile) noTrashFile.style.display = "none";
+    } else if (noTrashFile) {
+      noTrashFile.style.display = "none";
     }
 
-    // Init dropdown dan preview SAJA (TANPA FOLDER NAVIGATION)
-    initTrashActionDropdowns();
-    initFilePreviews(); // Pastikan preview berfungsi untuk file
+    if (trashTableBody) initTrashDropdowns(trashTableBody, "tr");
+    if (gridViewTrash) initTrashDropdowns(gridViewTrash, ".file-grid-item");
   }
 
-  function initTrashActionDropdowns() {
-    console.log("🗑️ initTrashActionDropdowns dipanggil");
-    const trashTableBody = document.getElementById("trashTableBody");
-    if (!trashTableBody) return;
+  // Inisialisasi dropdown di container tertentu
+  function initTrashDropdowns(containerParent, itemSelector) {
+    containerParent
+      .querySelectorAll(".action-dropdown")
+      .forEach((container) => {
+        const icon = container.querySelector(".dropdown-icon");
+        const menu = container.querySelector(".dropdown-menu");
+        if (!icon || !menu) return;
 
-    trashTableBody.querySelectorAll(".action-dropdown").forEach((container) => {
-      const icon = container.querySelector(".dropdown-icon");
-      const menu = container.querySelector(".dropdown-menu");
+        const newIcon = icon.cloneNode(true);
+        icon.replaceWith(newIcon);
 
-      if (!icon || !menu) return;
-
-      const newIcon = icon.cloneNode(true);
-      icon.replaceWith(newIcon);
-
-      newIcon.addEventListener("click", (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        // Tutup semua dropdown trash lainnya
-        trashTableBody.querySelectorAll(".dropdown-menu").forEach((m) => {
-          if (m !== menu) m.style.display = "none";
+        newIcon.addEventListener("click", (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          toggleDropdown(menu, containerParent);
         });
 
-        // Toggle dropdown ini
-        menu.style.display = menu.style.display === "block" ? "none" : "block";
+        bindTrashActions(container, itemSelector);
       });
 
-      // restore file - PERBAIKAN DI SINI
-      const restoreBtn = container.querySelector(".restore");
-      if (restoreBtn) {
-        const newRestoreBtn = restoreBtn.cloneNode(true);
-        restoreBtn.replaceWith(newRestoreBtn);
-
-        newRestoreBtn.addEventListener("click", async function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          const id_trash = this.dataset.id;
-          const row = this.closest("tr");
-          const fileName =
-            row.querySelector(".file-name-text")?.textContent || "file";
-          const isFolder = row.dataset.type === "folder";
-          const originalParentId = row.dataset.original_parent_id || "0";
-
-          const confirmMessage = isFolder
-            ? `Pulihkan folder "${fileName}" dan SEMUA isinya?`
-            : `Pulihkan "${fileName}"?`;
-
-          if (!confirm(confirmMessage)) {
-            return;
-          }
-
-          // Show loading state
-          const originalText = newRestoreBtn.textContent;
-          newRestoreBtn.textContent = "Memulihkan...";
-          newRestoreBtn.style.opacity = "0.6";
-
-          try {
-            const formData = new FormData();
-            formData.append("action", "restore_file");
-            formData.append("id_trash", id_trash);
-
-            console.log("🔄 Restoring from trash:", {
-              id_trash,
-              fileName,
-              isFolder,
-              originalParentId,
-            });
-
-            const response = await fetch("file_action.php", {
-              method: "POST",
-              body: formData,
-            });
-
-            const data = await response.json();
-            console.log("📊 Restore response:", data);
-
-            if (data.success) {
-              // Hapus row dari tabel trash
-              row.remove();
-
-              // Refresh UI trash
-              refreshTrashUI();
-
-              // Tampilkan notifikasi
-              showNotification(
-                isFolder
-                  ? `Folder "${fileName}" dan semua isinya berhasil dipulihkan!`
-                  : `"${fileName}" berhasil dipulihkan!`,
-                "success"
-              );
-
-              // Jika kita di halaman allfiles, refresh view
-              if (fileTableBody) {
-                console.log("🔄 Refreshing allfiles view after restore");
-
-                // Cek apakah file dikembalikan ke folder yang sedang aktif
-                const restoredToCurrentFolder =
-                  parseInt(originalParentId) === currentParentId;
-
-                if (restoredToCurrentFolder) {
-                  // Refresh folder yang sedang aktif
-                  setTimeout(() => {
-                    loadFiles(currentParentId);
-                  }, 1000);
-                } else if (originalParentId !== "0") {
-                  // Tampilkan hint navigasi ke folder asal
-                  showNavigationHint(originalParentId, fileName, isFolder);
-                }
-              }
-            } else {
-              showNotification(
-                "Gagal memulihkan: " + (data.message || "Unknown error"),
-                "error"
-              );
-            }
-          } catch (error) {
-            console.error("❌ Error restoring:", error);
-            showNotification(
-              "Terjadi error jaringan: " + error.message,
-              "error"
-            );
-          } finally {
-            // Reset button state
-            newRestoreBtn.textContent = originalText;
-            newRestoreBtn.style.opacity = "1";
-          }
-
-          // Tutup dropdown
-          menu.style.display = "none";
-        });
-      }
-
-      const deletePermanentBtn = container.querySelector(".delete-permanent");
-      if (deletePermanentBtn) {
-        const newDeleteBtn = deletePermanentBtn.cloneNode(true);
-        deletePermanentBtn.replaceWith(newDeleteBtn);
-
-        newDeleteBtn.addEventListener("click", async function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          const id_trash = this.dataset.id;
-          const fileName =
-            this.closest("tr").querySelector(".file-name-text")?.textContent ||
-            "file";
-
-          if (!confirm(`Hapus permanen "${fileName}"?`)) return;
-
-          try {
-            const formData = new FormData();
-            formData.append("action", "delete_permanent");
-            formData.append("id_trash", id_trash);
-
-            const response = await fetch("file_action.php", {
-              method: "POST",
-              body: formData,
-            });
-
-            const data = await response.json();
-            console.log("Delete permanent response:", data);
-
-            if (data.success) {
-              container.closest("tr").remove();
-              refreshTrashUI();
-              optimizedStorageUpdate();
-              showNotification(data.message, "success");
-            } else {
-              showNotification(
-                "Gagal menghapus: " + (data.message || "Unknown error"),
-                "error"
-              );
-            }
-          } catch (error) {
-            console.error("❌ Error deleting permanently:", error);
-            showNotification("Terjadi error: " + error.message, "error");
-          }
-
-          menu.style.display = "none";
-        });
-      }
-    });
-
-    // Event listener untuk menutup dropdown trash saat klik di luar
+    // Tutup semua dropdown jika klik di luar
     document.addEventListener("click", (e) => {
       if (!e.target.closest(".action-dropdown")) {
-        trashTableBody.querySelectorAll(".dropdown-menu").forEach((m) => {
-          m.style.display = "none";
-        });
+        containerParent
+          .querySelectorAll(".dropdown-menu")
+          .forEach((m) => (m.style.display = "none"));
       }
     });
   }
 
-  // Fungsi untuk menampilkan hint navigasi (opsional)
-  function showNavigationHint(folderId, fileName) {
-    // Buat notifikasi khusus dengan opsi navigasi
+  // Toggle dropdown menu
+  function toggleDropdown(menu, containerParent) {
+    containerParent.querySelectorAll(".dropdown-menu").forEach((m) => {
+      if (m !== menu) m.style.display = "none";
+    });
+    menu.style.display = menu.style.display === "block" ? "none" : "block";
+  }
+
+  // Bind restore & delete actions
+  function bindTrashActions(container, itemSelector) {
+    const restoreBtn = container.querySelector(".restore");
+    const deleteBtn = container.querySelector(".delete-permanent");
+    const menu = container.querySelector(".dropdown-menu");
+
+    // Restore
+    if (restoreBtn) {
+      const newRestoreBtn = restoreBtn.cloneNode(true);
+      restoreBtn.replaceWith(newRestoreBtn);
+
+      newRestoreBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const id_trash = newRestoreBtn.dataset.id;
+        const item = container.closest(itemSelector);
+        const fileName =
+          item.querySelector(".file-name-text, .file-grid-name")?.textContent ||
+          "file";
+
+        if (!confirm(`Pulihkan "${fileName}"?`)) return;
+
+        await trashActionRequest({
+          action: "restore_file",
+          id_trash,
+          item,
+          btn: newRestoreBtn,
+          menu,
+          successMsg: `"${fileName}" berhasil dipulihkan!`,
+        });
+      });
+    }
+
+    // Delete permanent
+    if (deleteBtn) {
+      const newDeleteBtn = deleteBtn.cloneNode(true);
+      deleteBtn.replaceWith(newDeleteBtn);
+
+      newDeleteBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const id_trash = newDeleteBtn.dataset.id;
+        const item = container.closest(itemSelector);
+        const fileName =
+          item.querySelector(".file-name-text, .file-grid-name")?.textContent ||
+          "file";
+
+        if (!confirm(`Hapus permanen "${fileName}"?`)) return;
+
+        await trashActionRequest({
+          action: "delete_permanent",
+          id_trash,
+          item,
+          btn: newDeleteBtn,
+          menu,
+          successMsg: `File "${fileName}" berhasil dihapus permanen`,
+          optimizeStorage: true,
+        });
+      });
+    }
+  }
+
+  // Generic AJAX request for trash actions
+  async function trashActionRequest({
+    action,
+    id_trash,
+    item,
+    btn,
+    menu,
+    successMsg,
+    optimizeStorage = false,
+  }) {
+    const originalText = btn.textContent;
+    btn.textContent =
+      action === "restore_file" ? "Memulihkan..." : "Menghapus...";
+    btn.style.opacity = "0.6";
+
+    try {
+      const formData = new FormData();
+      formData.append("action", action);
+      formData.append("id_trash", id_trash);
+
+      const response = await fetch("file_action.php", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        item.remove();
+        showNotification(successMsg, "success");
+
+        if (optimizeStorage) optimizedStorageUpdate();
+      } else {
+        showNotification("Gagal: " + (data.message || "Unknown"), "error");
+      }
+    } catch (error) {
+      showNotification("Terjadi error jaringan: " + error.message, "error");
+    } finally {
+      btn.textContent = originalText;
+      btn.style.opacity = "1";
+      if (menu) menu.style.display = "none";
+    }
+  }
+
+  // ===================== Notification =====================
+  function showNotification(message, type = "info") {
     const notification = document.createElement("div");
-    notification.className = "notification info";
+    notification.className = `notification ${type}`;
     notification.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
     padding: 12px 20px;
-    background: #2196F3;
+    background: ${
+      type === "success" ? "#4CAF50" : type === "error" ? "#f44336" : "#2196F3"
+    };
     color: white;
     border-radius: 4px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     z-index: 10000;
-    max-width: 350px;
-    cursor: pointer;
+    max-width: 300px;
   `;
-
-    notification.innerHTML = `
-    <div>"${fileName}" telah dipulihkan</div>
-    <div style="font-size: 12px; opacity: 0.9; margin-top: 5px;">
-      Klik untuk membuka lokasi file
-    </div>
-  `;
-
-    notification.addEventListener("click", () => {
-      // Navigasi ke folder tujuan
-      navigateToFolder(parseInt(folderId), "Lokasi File");
-      notification.remove();
-    });
-
-    document.body.appendChild(notification);
-
-    // Hapus notifikasi setelah 5 detik
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.remove();
-      }
-    }, 5000);
-  }
-
-  // ===================== NOTIFICATION FUNCTION =====================
-  function showNotification(message, type = "info") {
-    // Buat elemen notifikasi
-    const notification = document.createElement("div");
-    notification.className = `notification ${type}`;
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      background: ${
-        type === "success"
-          ? "#4CAF50"
-          : type === "error"
-          ? "#f44336"
-          : "#2196F3"
-      };
-      color: white;
-      border-radius: 4px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      z-index: 10000;
-      max-width: 300px;
-    `;
     notification.textContent = message;
-
     document.body.appendChild(notification);
 
-    // Hapus notifikasi setelah 3 detik
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.remove();
-      }
-    }, 3000);
+    setTimeout(() => notification.remove(), 3000);
   }
 
   // ===================== REFRESH FILE TABLE =====================
