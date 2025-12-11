@@ -1383,68 +1383,70 @@ document.addEventListener("DOMContentLoaded", () => {
         menu.style.display = menu.style.display === "block" ? "none" : "block";
       });
 
-      const moveTrash = container.querySelector(".move-trash");
-      if (moveTrash) {
-        const newMoveTrash = moveTrash.cloneNode(true);
-        moveTrash.replaceWith(newMoveTrash);
+      // Event delegation untuk semua tombol move-trash
+      document.addEventListener("click", async function (e) {
+        const target = e.target.closest(".move-trash");
+        if (!target) return;
 
-        newMoveTrash.addEventListener("click", async function (e) {
-          e.preventDefault();
-          e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
-          const id_file = this.dataset.id;
-          const file_name =
-            this.closest("tr").querySelector("[data-file-name]")?.dataset
-              .fileName || "Unknown";
+        const id_file = target.dataset.id;
+        if (!id_file) return;
 
-          // Confirm pakai SweetAlert2
-          const confirmResult = await showConfirm(
-            "Pindahkan ke Sampah?",
-            `Yakin ingin memindahkan file "${file_name}" ke sampah?`
-          );
-          if (!confirmResult.isConfirmed) return;
+        // Tentukan nama file
+        let file_name = "Unknown";
+        const fileNameEl =
+          target.closest("tr")?.querySelector("[data-file-name]") ||
+          target.closest(".file-grid-item")?.querySelector(".file-grid-name");
+        if (fileNameEl) file_name = fileNameEl.textContent.trim();
 
-          try {
-            const formData = new FormData();
-            formData.append("action", "move_to_trash");
-            formData.append("id_file", id_file);
+        // Konfirmasi pakai SweetAlert2
+        const confirmResult = await showConfirm(
+          "Pindahkan ke Sampah?",
+          `Yakin ingin memindahkan file "${file_name}" ke sampah?`
+        );
+        if (!confirmResult.isConfirmed) return;
 
-            const response = await fetch("file_action.php", {
-              method: "POST",
-              body: formData,
-            });
-            const textResponse = await response.text();
+        try {
+          showLoading("Memindahkan file...");
 
-            let data;
-            try {
-              data = JSON.parse(textResponse);
-            } catch {
-              showError("Error: Response tidak valid dari server");
-              return;
-            }
+          const formData = new FormData();
+          formData.append("action", "move_to_trash");
+          formData.append("id_file", id_file);
 
-            if (data.success) {
-              const row = container.closest("tr");
-              if (row) row.remove();
+          const response = await fetch("file_action.php", {
+            method: "POST",
+            body: formData,
+          });
 
-              if (typeof refreshFileUI === "function") refreshFileUI();
-              if (typeof refreshTrashUI === "function") refreshTrashUI();
+          const data = await response.json();
+          closeLoading();
 
-              showSuccess(
-                `File "${file_name}" berhasil dipindahkan ke sampah!`
-              );
-            } else {
-              showError(
-                "Gagal memindahkan file: " + (data.message || "Unknown error")
-              );
-            }
-          } catch (error) {
-            showError("Terjadi error jaringan: " + error.message);
+          if (data.success) {
+            // Hapus element di table atau grid
+            const rowOrItem =
+              target.closest("tr") || target.closest(".file-grid-item");
+            if (rowOrItem) rowOrItem.remove();
+
+            if (typeof refreshFileUI === "function") refreshFileUI();
+            if (typeof refreshTrashUI === "function") refreshTrashUI();
+
+            showSuccess(`File "${file_name}" berhasil dipindahkan ke sampah!`);
+          } else {
+            showError(
+              "Gagal memindahkan file: " + (data.message || "Unknown error")
+            );
           }
+        } catch (err) {
+          closeLoading();
+          showError("Terjadi error jaringan: " + err.message);
+        }
 
-          menu.style.display = "none";
-        });
-      }
+        // Sembunyikan menu dropdown jika ada
+        const menu = target.closest(".dropdown-menu");
+        if (menu) menu.style.display = "none";
+      });
 
       // aksi share
       const shareBtn = container.querySelector(".share");

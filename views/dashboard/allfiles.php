@@ -525,33 +525,32 @@ if ($currentFolderId) {
           <?php else: ?>
         </div>
       <?php endif; ?>
+    <?php endforeach; ?>
+  <?php else: ?>
+    <div class="no-file" style="grid-column: 1 / -1; text-align:center; padding:40px;">
+      <img src="assets/img/not-file.png" alt="Tidak ada" width="150px" />
+      <p style="color:#999; margin-top:15px;">Belum ada file</p>
+    </div>
+  <?php endif; ?>
   </div>
-<?php endforeach; ?>
-<?php else: ?>
-  <div class="no-file" style="grid-column: 1 / -1; text-align:center; padding:40px;">
-    <img src="assets/img/not-file.png" alt="Tidak ada" width="150px" />
-    <p style="color:#999; margin-top:15px;">Belum ada file</p>
-  </div>
-<?php endif; ?>
-</div>
 
-<!-- Floating Upload Button -->
-<div class="fab-upload" id="fabUpload">
-  <button class="fab-main" id="fabToggle">
-    <i class="ri-add-line"></i>
-  </button>
+  <!-- Floating Upload Button -->
+  <div class="fab-upload" id="fabUpload">
+    <button class="fab-main" id="fabToggle">
+      <i class="ri-add-line"></i>
+    </button>
 
-  <div class="fab-menu" id="fabMenu">
-    <button class="fab-item" id="fabUploadFile">
-      <i class="ri-file-2-line"></i> Upload File
-    </button>
-    <button class="fab-item" id="fabUploadFolder">
-      <i class="ri-folder-upload-line"></i> Upload Folder
-    </button>
-    <button class="fab-item" id="fabCreateFolder">
-      <i class="ri-folder-add-line"></i> Buat Folder
-    </button>
+    <div class="fab-menu" id="fabMenu">
+      <button class="fab-item" id="fabUploadFile">
+        <i class="ri-file-2-line"></i> Upload File
+      </button>
+      <button class="fab-item" id="fabUploadFolder">
+        <i class="ri-folder-upload-line"></i> Upload Folder
+      </button>
+      <button class="fab-item" id="fabCreateFolder">
+        <i class="ri-folder-add-line"></i> Buat Folder
+      </button>
+    </div>
   </div>
-</div>
 
 </section>
