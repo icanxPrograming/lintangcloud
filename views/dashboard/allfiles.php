@@ -143,6 +143,31 @@ if ($currentFolderId) {
     overflow: hidden;
   }
 
+  /* Dropdown harus keluar dari container */
+  .file-grid-view .action-dropdown {
+    position: static !important;
+  }
+
+  /* Override untuk dropdown di grid view */
+  .file-grid-view .dropdown-menu {
+    position: fixed !important;
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+    background: rgba(20, 25, 35, 0.98) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 8px !important;
+    padding: 8px 0 !important;
+    min-width: 180px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+    z-index: 9999 !important;
+    color: white !important;
+    display: none !important;
+    transform: translateX(15px) !important;
+    /* GESER KE KANAN 15px */
+  }
+
   .file-grid-item:hover {
     background: rgba(255, 255, 255, 0.12);
     transform: translateY(-3px);
@@ -497,10 +522,10 @@ if ($currentFolderId) {
         $minioKey = $file['minio_object_key'] ?? null;
         $fileId = $file['id_file'];
 
-        // Determine icon
         $iconClass = $fileType === 'folder' ? 'ri-folder-line' : 'ri-file-line';
         $iconStyle = $fileType === 'folder' ? 'color:#ffa500;' : 'color:#666;';
         ?>
+
         <div class="file-grid-item" data-id="<?= $fileId ?>">
           <div class="file-grid-actions">
             <div class="action-dropdown">
@@ -510,19 +535,15 @@ if ($currentFolderId) {
                   <div class="dropdown-item">
                     <a href="download.php?file=<?= urlencode($minioKey) ?>">Download</a>
                   </div>
-                  <div class="dropdown-item move-trash" data-id="<?= $fileId ?>">Pindahkan ke Sampah</div>
-                  <div class="dropdown-item disabled">Bagikan (Tidak tersedia)</div>
-                <?php else: ?>
-                  <div class="dropdown-item move-trash" data-id="<?= $fileId ?>">Pindahkan ke Sampah</div>
-                  <div class="dropdown-item disabled">Bagikan (Tidak tersedia)</div>
                 <?php endif; ?>
+                <div class="dropdown-item move-trash" data-id="<?= $fileId ?>">Pindahkan ke Sampah</div>
+                <div class="dropdown-item disabled">Bagikan (Tidak tersedia)</div>
               </div>
             </div>
           </div>
 
           <?php if ($fileType === 'folder'): ?>
-            <a href="?page=allfiles&folder=<?= $fileId ?>"
-              style="display:block; text-decoration:none; color:inherit;">
+            <a href="?page=allfiles&folder=<?= $fileId ?>" style="display:block; text-decoration:none; color:inherit;">
             <?php else: ?>
               <div class="file-preview-trigger"
                 data-id="<?= $fileId ?>"
@@ -550,7 +571,8 @@ if ($currentFolderId) {
         </div>
       <?php endif; ?>
 
-  </div> <!-- Tutup file-grid-item di sini -->
+  </div> <!-- Tutup file-grid-item -->
+
 <?php endforeach; ?>
 <?php else: ?>
   <div class="no-file" style="grid-column: 1 / -1; text-align:center; padding:40px;">
