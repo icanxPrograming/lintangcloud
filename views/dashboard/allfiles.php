@@ -143,31 +143,6 @@ if ($currentFolderId) {
     overflow: hidden;
   }
 
-  /* Dropdown harus keluar dari container */
-  .file-grid-view .action-dropdown {
-    position: static !important;
-  }
-
-  /* Override untuk dropdown di grid view */
-  .file-grid-view .dropdown-menu {
-    position: fixed !important;
-    top: auto !important;
-    right: auto !important;
-    left: auto !important;
-    background: rgba(20, 25, 35, 0.98) !important;
-    backdrop-filter: blur(10px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 8px !important;
-    padding: 8px 0 !important;
-    min-width: 180px !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
-    z-index: 9999 !important;
-    color: white !important;
-    display: none !important;
-    transform: translateX(15px) !important;
-    /* GESER KE KANAN 15px */
-  }
-
   .file-grid-item:hover {
     background: rgba(255, 255, 255, 0.12);
     transform: translateY(-3px);
