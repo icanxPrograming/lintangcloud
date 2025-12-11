@@ -15,23 +15,33 @@ class MinioClient
 
     public function __construct()
     {
-        $this->bucket = $_ENV['MINIO_BUCKET'];
+        $this->bucket   = getenv('MINIO_BUCKET');
+        $region         = getenv('MINIO_REGION');
+        $endpoint       = getenv('MINIO_ENDPOINT');
+        $key            = getenv('MINIO_KEY');
+        $secret         = getenv('MINIO_SECRET');
+
+        // Cek apakah ada config yang kosong
+        if (!$this->bucket || !$region || !$endpoint || !$key || !$secret) {
+            die("MinIO Configuration Error: pastikan semua environment variable MINIO sudah diisi.");
+        }
 
         try {
             $this->client = new S3Client([
                 'version' => 'latest',
-                'region'  => $_ENV['MINIO_REGION'],
-                'endpoint' => $_ENV['MINIO_ENDPOINT'],
+                'region'  => $region,
+                'endpoint' => $endpoint,
                 'use_path_style_endpoint' => true,
                 'credentials' => [
-                    'key'    => $_ENV['MINIO_KEY'],
-                    'secret' => $_ENV['MINIO_SECRET'],
+                    'key'    => $key,
+                    'secret' => $secret,
                 ],
             ]);
         } catch (AwsException $e) {
-            die("Backblaze Connection Error: " . $e->getMessage());
+            die("MinIO Connection Error: " . $e->getMessage());
         }
     }
+
 
     // ============================
     // UPLOAD
