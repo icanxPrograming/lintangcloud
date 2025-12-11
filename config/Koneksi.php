@@ -15,7 +15,7 @@ class Koneksi
 
       // Ambil environment variable Railway / hosting
       $host     = getenv('MYSQLHOST') ?: die("MYSQLHOST missing");
-      $dbname   = getenv('MYSQLDATABASE') ?: die("MYSQLDATABASE missing");
+      $dbname   = getenv('MYSQL_DATABASE') ?: die("MYSQL_DATABASE missing");
       $username = getenv('MYSQLUSER') ?: die("MYSQLUSER missing");
       $password = getenv('MYSQLPASSWORD') ?: die("MYSQLPASSWORD missing");
       $port     = getenv('MYSQLPORT') ?: 3306;
