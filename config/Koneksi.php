@@ -14,11 +14,11 @@ class Koneksi
     if (self::$instance === null) {
 
       // Ambil environment variable Railway / hosting
-      $host     = getenv('DB_HOST');
-      $dbname   = getenv('DB_DATABASE');
-      $username = getenv('DB_USERNAME');
-      $password = getenv('DB_PASSWORD');
-      $port     = getenv('DB_PORT') ?: 3306;
+      $host     = getenv('MYSQLHOST') ?: die("MYSQLHOST missing");
+      $dbname   = getenv('MYSQLDATABASE') ?: die("MYSQLDATABASE missing");
+      $username = getenv('MYSQLUSER') ?: die("MYSQLUSER missing");
+      $password = getenv('MYSQLPASSWORD') ?: die("MYSQLPASSWORD missing");
+      $port     = getenv('MYSQLPORT') ?: 3306;
 
       try {
         self::$instance = new PDO(
