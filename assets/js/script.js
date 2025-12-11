@@ -1383,7 +1383,6 @@ document.addEventListener("DOMContentLoaded", () => {
         menu.style.display = menu.style.display === "block" ? "none" : "block";
       });
 
-      // aksi move trash - VERSI AJAX
       const moveTrash = container.querySelector(".move-trash");
       if (moveTrash) {
         const newMoveTrash = moveTrash.cloneNode(true);
@@ -1398,82 +1397,49 @@ document.addEventListener("DOMContentLoaded", () => {
             this.closest("tr").querySelector("[data-file-name]")?.dataset
               .fileName || "Unknown";
 
-          console.log("🔄 Move to trash clicked:", {
-            id_file: id_file,
-            file_name: file_name,
-            element: this,
-          });
-
-          if (!confirm(`Pindahkan ke sampah?`)) {
-            return;
-          }
+          // Confirm pakai SweetAlert2
+          const confirmResult = await showConfirm(
+            "Pindahkan ke Sampah?",
+            `Yakin ingin memindahkan file "${file_name}" ke sampah?`
+          );
+          if (!confirmResult.isConfirmed) return;
 
           try {
             const formData = new FormData();
             formData.append("action", "move_to_trash");
             formData.append("id_file", id_file);
-            formData.append("debug", "true"); // Tambahkan flag debug
-
-            console.log("📤 Sending request...");
 
             const response = await fetch("file_action.php", {
               method: "POST",
               body: formData,
             });
-
-            console.log(
-              "📥 Response status:",
-              response.status,
-              response.statusText
-            );
-
             const textResponse = await response.text();
-            console.log("📄 Raw response:", textResponse);
 
             let data;
             try {
               data = JSON.parse(textResponse);
-            } catch (parseError) {
-              console.error("❌ JSON Parse Error:", parseError);
-              showNotification(
-                "Error: Response tidak valid dari server",
-                "error"
-              );
+            } catch {
+              showError("Error: Response tidak valid dari server");
               return;
             }
 
-            console.log("📊 Parsed data:", data);
-
             if (data.success) {
-              console.log("✅ Success - removing row from table");
               const row = container.closest("tr");
-              if (row) {
-                row.remove();
-                console.log("✅ Row removed");
-              }
+              if (row) row.remove();
 
-              // Refresh UI
-              if (typeof refreshFileUI === "function") {
-                refreshFileUI();
-              }
-              if (typeof refreshTrashUI === "function") {
-                refreshTrashUI();
-              }
+              if (typeof refreshFileUI === "function") refreshFileUI();
+              if (typeof refreshTrashUI === "function") refreshTrashUI();
 
-              showNotification(`berhasil dipindahkan ke sampah!`, "success");
+              showSuccess(
+                `File "${file_name}" berhasil dipindahkan ke sampah!`
+              );
             } else {
-              console.error("❌ Server returned error:", data.message);
-              showNotification(
-                "Gagal memindahkan file: " + (data.message || "Unknown error"),
-                "error"
+              showError(
+                "Gagal memindahkan file: " + (data.message || "Unknown error")
               );
             }
           } catch (error) {
-            console.error("❌ Network/Fetch Error:", error);
-            showNotification(
-              "Terjadi error jaringan: " + error.message,
-              "error"
-            );
+            showError("Terjadi error jaringan: " + error.message);
           }
 
           menu.style.display = "none";
