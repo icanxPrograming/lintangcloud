@@ -1794,7 +1794,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ===================== TRASH PAGE FUNCTIONALITY =====================
   const trashTableBody = document.getElementById("trashTableBody");
-  const noTrashFile = document.querySelector(".file-section .no-file-trash");
 
   // Fungsi untuk load trash files - HANYA ROOT LEVEL
   function loadTrashFiles() {
@@ -1935,13 +1934,13 @@ document.addEventListener("DOMContentLoaded", () => {
     trashTableBody.appendChild(tr);
   }
 
-  // ===================== GENERIC TRASH HANDLER =====================
+  // ===================== GENERIC TRASH HANDLER (SWEETALERT2) =====================
 
   // Refresh trash UI (table & grid)
   function refreshTrashUI() {
     const trashTableBody = document.getElementById("trashTableBody");
     const gridViewTrash = document.getElementById("gridViewTrash");
-    const noTrashFile = document.getElementById("noTrashFile");
+    const noTrashFile = document.querySelector(".file-section .no-file-trash");
 
     if (trashTableBody && trashTableBody.children.length === 0) {
       if (noTrashFile) noTrashFile.style.display = "flex";
@@ -1974,7 +1973,6 @@ document.addEventListener("DOMContentLoaded", () => {
         bindTrashActions(container, itemSelector);
       });
 
-    // Tutup semua dropdown jika klik di luar
     document.addEventListener("click", (e) => {
       if (!e.target.closest(".action-dropdown")) {
         containerParent
@@ -1992,7 +1990,7 @@ document.addEventListener("DOMContentLoaded", () => {
     menu.style.display = menu.style.display === "block" ? "none" : "block";
   }
 
-  // Bind restore & delete actions
+  // Bind restore & delete actions dengan SweetAlert2
   function bindTrashActions(container, itemSelector) {
     const restoreBtn = container.querySelector(".restore");
     const deleteBtn = container.querySelector(".delete-permanent");
@@ -2013,16 +2011,21 @@ document.addEventListener("DOMContentLoaded", () => {
           item.querySelector(".file-name-text, .file-grid-name")?.textContent ||
           "file";
 
-        if (!confirm(`Pulihkan "${fileName}"?`)) return;
+        const confirmed = await showConfirm(
+          "Pulihkan File",
+          `Pulihkan "${fileName}"?`
+        );
+        if (!confirmed.isConfirmed) return;
 
+        showLoading("Memulihkan...");
         await trashActionRequest({
           action: "restore_file",
           id_trash,
           item,
-          btn: newRestoreBtn,
           menu,
           successMsg: `"${fileName}" berhasil dipulihkan!`,
         });
+        Swal.close();
       });
     }
 
@@ -2041,17 +2044,22 @@ document.addEventListener("DOMContentLoaded", () => {
           item.querySelector(".file-name-text, .file-grid-name")?.textContent ||
           "file";
 
-        if (!confirm(`Hapus permanen "${fileName}"?`)) return;
+        const confirmed = await showConfirm(
+          "Hapus Permanen",
+          `Hapus permanen "${fileName}"?`
+        );
+        if (!confirmed.isConfirmed) return;
 
+        showLoading("Menghapus...");
         await trashActionRequest({
           action: "delete_permanent",
           id_trash,
           item,
-          btn: newDeleteBtn,
           menu,
           successMsg: `File "${fileName}" berhasil dihapus permanen`,
           optimizeStorage: true,
         });
+        Swal.close();
       });
     }
   }
@@ -2061,16 +2069,10 @@ document.addEventListener("DOMContentLoaded", () => {
     action,
     id_trash,
     item,
-    btn,
     menu,
     successMsg,
     optimizeStorage = false,
   }) {
-    const originalText = btn.textContent;
-    btn.textContent =
-      action === "restore_file" ? "Memulihkan..." : "Menghapus...";
-    btn.style.opacity = "0.6";
-
     try {
       const formData = new FormData();
       formData.append("action", action);
@@ -2084,17 +2086,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.success) {
         item.remove();
-        showNotification(successMsg, "success");
+        showSuccess(successMsg);
 
         if (optimizeStorage) optimizedStorageUpdate();
       } else {
-        showNotification("Gagal: " + (data.message || "Unknown"), "error");
+        showError("Gagal: " + (data.message || "Unknown"));
       }
     } catch (error) {
-      showNotification("Terjadi error jaringan: " + error.message, "error");
+      showError("Terjadi error jaringan: " + error.message);
     } finally {
-      btn.textContent = originalText;
-      btn.style.opacity = "1";
       if (menu) menu.style.display = "none";
     }
   }

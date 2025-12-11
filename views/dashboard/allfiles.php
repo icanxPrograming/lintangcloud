@@ -498,14 +498,14 @@ if ($currentFolderId) {
 
           <?php if ($fileType === 'folder'): ?>
             <a href="?page=allfiles&folder=<?= $fileId ?>"
-              style="display:block; text-decoration:none; color:inherit; height:100%;">
+              style="display:block; text-decoration:none; color:inherit;">
             <?php else: ?>
               <div class="file-preview-trigger"
                 data-id="<?= $fileId ?>"
                 data-name="<?= $fileName ?>"
                 data-type="<?= $fileType ?>"
                 data-size="<?= $fileSize ?>"
-                style="display:block; height:100%; cursor:pointer;">
+                style="display:block; cursor:pointer;">
               <?php endif; ?>
 
               <div class="file-grid-icon <?= $fileType === 'folder' ? 'folder' : 'file' ?>">
