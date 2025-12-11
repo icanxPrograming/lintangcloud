@@ -18,7 +18,7 @@ class Koneksi
 
       // Load .env
       $dotenv = Dotenv::createImmutable(dirname(__DIR__));
-      $dotenv->load();
+      $dotenv->safeLoad(); // <-- ganti load() dengan safeLoad()
 
       $host     = $_ENV['DB_HOST'];
       $dbname   = $_ENV['DB_DATABASE'];
