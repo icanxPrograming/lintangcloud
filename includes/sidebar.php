@@ -115,9 +115,9 @@ $tr = $_SESSION['lang_data'] ?? [];
     </ul>
 
     <div class="bottom-section">
-      <div class="mode-switch" id="modeToggle">
+      <div class="mode-switch modeToggle">
         <div class="switch-circle">
-          <i id="modeIcon" class="ri-sun-line"></i>
+          <i class="modeIcon ri-sun-line"></i>
         </div>
       </div>
     </div>
