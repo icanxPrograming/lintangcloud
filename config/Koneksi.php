@@ -14,10 +14,10 @@ class Koneksi
     if (self::$instance === null) {
 
       // Ambil environment variable Railway / hosting
-      $host     = getenv('DB_HOST') ?: 'localhost';
-      $dbname   = getenv('DB_DATABASE') ?: 'test';
-      $username = getenv('DB_USERNAME') ?: 'root';
-      $password = getenv('DB_PASSWORD') ?: '';
+      $host     = getenv('DB_HOST');
+      $dbname   = getenv('DB_DATABASE');
+      $username = getenv('DB_USERNAME');
+      $password = getenv('DB_PASSWORD');
       $port     = getenv('DB_PORT') ?: 3306;
 
       try {
