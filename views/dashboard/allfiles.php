@@ -137,10 +137,16 @@ if ($currentFolderId) {
     position: relative;
     cursor: pointer;
     height: 180px;
+    /* Tinggi tetap */
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* Konten utama tetap hidden */
+  }
+
+  .file-grid-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   }
 
   /* Link atau trigger harus mengisi card */
@@ -151,74 +157,70 @@ if ($currentFolderId) {
     flex-direction: column;
     text-decoration: none;
     color: inherit;
+  }
+
+  .file-grid-icon {
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 40px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .file-grid-icon.folder {
+    color: #ffa500;
+  }
+
+  .file-grid-icon.file {
+    color: #666;
+  }
+
+  .file-grid-name {
+    font-size: 13px;
+    color: white;
+    text-align: center;
+    margin-bottom: 8px;
+    word-break: break-word;
+    line-height: 1.3;
+    max-height: 34px;
     overflow: hidden;
-    /* Konten utama tetap rapi */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    flex-grow: 1;
+    /* Ambil ruang tersisa */
   }
 
-  /* OVERRIDE UNTUK DROPDOWN DI GRID VIEW */
-  .file-grid-view .action-dropdown {
-    position: static !important;
-    /* Reset positioning */
+  .file-grid-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: auto;
+    /* Dorong ke bawah */
   }
 
-  /* Dropdown menu khusus untuk grid view */
-  .file-grid-view .dropdown-menu {
-    position: fixed !important;
-    /* Gunakan fixed agar keluar viewport */
-    top: auto !important;
-    right: auto !important;
-    left: auto !important;
-    min-width: 180px !important;
-    background: rgba(20, 25, 35, 0.98) !important;
-    backdrop-filter: blur(10px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 8px !important;
-    padding: 8px 0 !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
-    z-index: 9999 !important;
-    color: white !important;
-    display: none !important;
-    transform: translateX(10px) translateY(10px) !important;
-    /* Geser ke kanan-bawah */
+  .file-grid-type {
+    background: rgba(0, 195, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 10px;
+    display: inline-block;
+    text-align: center;
+    width: fit-content;
+    margin: 0 auto;
   }
 
-  /* Saat aktif, geser lebih ke kanan agar tidak tenggelam */
-  .file-grid-view .dropdown-menu.active {
-    display: block !important;
-    transform: translateX(20px) translateY(10px) !important;
-    /* Geser lebih ke kanan */
+  .file-grid-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    /* Di atas konten */
   }
 
-  /* Dropdown item styling untuk dark mode */
-  .file-grid-view .dropdown-menu .dropdown-item {
-    padding: 10px 16px !important;
-    color: rgba(255, 255, 255, 0.9) !important;
-    font-size: 13px !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    white-space: nowrap !important;
-  }
-
-  .file-grid-view .dropdown-menu .dropdown-item:hover {
-    background: rgba(0, 195, 255, 0.15) !important;
-    color: #00c3ff !important;
-  }
-
-  /* Link dalam dropdown */
-  .file-grid-view .dropdown-menu .dropdown-item a {
-    color: inherit !important;
-    text-decoration: none !important;
-    display: block !important;
-    width: 100% !important;
-  }
-
-  /* Disabled state */
-  .file-grid-view .dropdown-menu .dropdown-item.disabled {
-    color: rgba(255, 255, 255, 0.5) !important;
-    cursor: not-allowed !important;
-  }
-
-  /* Tombol dropdown di dalam grid */
   .file-grid-actions .dropdown-icon {
     color: rgba(255, 255, 255, 0.7);
     font-size: 18px;
@@ -231,8 +233,11 @@ if ($currentFolderId) {
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    z-index: 10;
-    /* Di atas konten */
+  }
+
+  .file-grid-actions .dropdown-icon:hover {
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
   }
 
   /* Responsive adjustments */
@@ -249,16 +254,8 @@ if ($currentFolderId) {
 
     .file-grid-item {
       height: 160px;
+      /* Lebih kecil di mobile */
       padding: 12px;
-    }
-
-    /* Untuk mobile, geser dropdown lebih ke kanan */
-    .file-grid-view .dropdown-menu {
-      transform: translateX(15px) translateY(10px) !important;
-    }
-
-    .file-grid-view .dropdown-menu.active {
-      transform: translateX(25px) translateY(10px) !important;
     }
   }
 
