@@ -125,6 +125,7 @@ if ($currentFolderId) {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 15px;
     margin-top: 20px;
+    padding: 10px;
   }
 
   .file-grid-item {
@@ -135,6 +136,11 @@ if ($currentFolderId) {
     border: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
     cursor: pointer;
+    height: 180px;
+    /* Tinggi tetap */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .file-grid-item:hover {
@@ -143,10 +149,24 @@ if ($currentFolderId) {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   }
 
+  /* Link atau trigger harus mengisi card */
+  .file-grid-item>a,
+  .file-grid-item>.file-preview-trigger {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+  }
+
   .file-grid-icon {
     text-align: center;
     margin-bottom: 10px;
     font-size: 40px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .file-grid-icon.folder {
@@ -169,6 +189,8 @@ if ($currentFolderId) {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    flex-grow: 1;
+    /* Ambil ruang tersisa */
   }
 
   .file-grid-info {
@@ -177,6 +199,8 @@ if ($currentFolderId) {
     gap: 4px;
     font-size: 11px;
     color: rgba(255, 255, 255, 0.7);
+    margin-top: auto;
+    /* Dorong ke bawah */
   }
 
   .file-grid-type {
@@ -185,12 +209,16 @@ if ($currentFolderId) {
     border-radius: 10px;
     display: inline-block;
     text-align: center;
+    width: fit-content;
+    margin: 0 auto;
   }
 
   .file-grid-actions {
     position: absolute;
     top: 10px;
     right: 10px;
+    z-index: 2;
+    /* Di atas konten */
   }
 
   .file-grid-actions .dropdown-icon {
@@ -212,14 +240,6 @@ if ($currentFolderId) {
     color: white;
   }
 
-  .file-grid-actions .dropdown-menu {
-    right: 0;
-    left: auto;
-    min-width: 160px;
-    transform: translateX(50px);
-    /* geser 10px ke kanan */
-  }
-
   /* Responsive adjustments */
   @media (max-width: 768px) {
     .file-table-view {
@@ -228,11 +248,26 @@ if ($currentFolderId) {
 
     .file-grid-view {
       display: grid !important;
-    }
-
-    .file-grid-view {
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
       gap: 12px;
+    }
+
+    .file-grid-item {
+      height: 160px;
+      /* Lebih kecil di mobile */
+      padding: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .file-grid-view {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+    }
+
+    .file-grid-item {
+      height: 150px;
+      padding: 10px;
     }
   }
 
@@ -461,7 +496,7 @@ if ($currentFolderId) {
     </div>
   </div>
 
-  <!-- GRID VIEW (FOR MOBILE) -->
+  <!-- FILE GRID VIEW (FOR MOBILE) -->
   <div class="file-grid-view" id="gridView">
     <?php if (!empty($files)): ?>
       <?php foreach ($files as $file): ?>
@@ -505,7 +540,7 @@ if ($currentFolderId) {
                 data-name="<?= $fileName ?>"
                 data-type="<?= $fileType ?>"
                 data-size="<?= $fileSize ?>"
-                style="display:block; cursor:pointer;">
+                style="display:block;cursor:pointer;">
               <?php endif; ?>
 
               <div class="file-grid-icon <?= $fileType === 'folder' ? 'folder' : 'file' ?>">
@@ -525,32 +560,34 @@ if ($currentFolderId) {
           <?php else: ?>
         </div>
       <?php endif; ?>
-    <?php endforeach; ?>
-  <?php else: ?>
-    <div class="no-file" style="grid-column: 1 / -1; text-align:center; padding:40px;">
-      <img src="assets/img/not-file.png" alt="Tidak ada" width="150px" />
-      <p style="color:#999; margin-top:15px;">Belum ada file</p>
-    </div>
-  <?php endif; ?>
-  </div>
 
-  <!-- Floating Upload Button -->
-  <div class="fab-upload" id="fabUpload">
-    <button class="fab-main" id="fabToggle">
-      <i class="ri-add-line"></i>
+  </div> <!-- Tutup file-grid-item di sini -->
+<?php endforeach; ?>
+<?php else: ?>
+  <div class="no-file" style="grid-column: 1 / -1; text-align:center; padding:40px;">
+    <img src="assets/img/not-file.png" alt="Tidak ada" width="150px" />
+    <p style="color:#999; margin-top:15px;">Belum ada file</p>
+  </div>
+<?php endif; ?>
+</div>
+
+<!-- Floating Upload Button -->
+<div class="fab-upload" id="fabUpload">
+  <button class="fab-main" id="fabToggle">
+    <i class="ri-add-line"></i>
+  </button>
+
+  <div class="fab-menu" id="fabMenu">
+    <button class="fab-item" id="fabUploadFile">
+      <i class="ri-file-2-line"></i> Upload File
     </button>
-
-    <div class="fab-menu" id="fabMenu">
-      <button class="fab-item" id="fabUploadFile">
-        <i class="ri-file-2-line"></i> Upload File
-      </button>
-      <button class="fab-item" id="fabUploadFolder">
-        <i class="ri-folder-upload-line"></i> Upload Folder
-      </button>
-      <button class="fab-item" id="fabCreateFolder">
-        <i class="ri-folder-add-line"></i> Buat Folder
-      </button>
-    </div>
+    <button class="fab-item" id="fabUploadFolder">
+      <i class="ri-folder-upload-line"></i> Upload Folder
+    </button>
+    <button class="fab-item" id="fabCreateFolder">
+      <i class="ri-folder-add-line"></i> Buat Folder
+    </button>
   </div>
+</div>
 
 </section>
