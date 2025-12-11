@@ -140,7 +140,8 @@ if ($currentFolderId) {
     /* Tinggi tetap */
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
+    /* Biarkan dropdown keluar */
   }
 
   .file-grid-item:hover {
