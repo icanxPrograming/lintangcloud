@@ -251,23 +251,12 @@ if ($currentFolderId) {
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
       gap: 12px;
     }
-
-    .file-grid-item {
-      height: 160px;
-      /* Lebih kecil di mobile */
-      padding: 12px;
-    }
   }
 
   @media (max-width: 480px) {
     .file-grid-view {
       grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
       gap: 10px;
-    }
-
-    .file-grid-item {
-      height: 150px;
-      padding: 10px;
     }
   }
 
