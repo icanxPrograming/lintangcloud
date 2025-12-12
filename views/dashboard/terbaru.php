@@ -223,7 +223,7 @@ if ($currentFolderId) {
     right: 0;
     left: auto;
     min-width: 160px;
-    transform: translateX(10px);
+    transform: translateX(25px);
   }
 
   /* Responsive adjustments */
