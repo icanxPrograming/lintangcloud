@@ -215,8 +215,8 @@ if ($currentFolderId) {
   .file-grid-actions .dropdown-menu {
     right: 0;
     left: auto;
-    min-width: 160px;
-    transform: scale(0) translateX(20px);
+    min-width: 150px;
+    transform: translateX(10px);
   }
 
   /* Responsive adjustments */
