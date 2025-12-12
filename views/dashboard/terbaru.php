@@ -466,7 +466,7 @@ if ($currentFolderId) {
     </div>
   </div>
 
-  <!-- GRID VIEW (FOR MOBILE) -->
+  <!-- FILE GRID VIEW (FOR MOBILE) -->
   <div class="file-grid-view" id="gridView">
     <?php if (!empty($files)): ?>
       <?php foreach ($files as $file): ?>
@@ -478,10 +478,10 @@ if ($currentFolderId) {
         $minioKey = $file['minio_object_key'] ?? null;
         $fileId = $file['id_file'];
 
-        // Determine icon
         $iconClass = $fileType === 'folder' ? 'ri-folder-line' : 'ri-file-line';
         $iconStyle = $fileType === 'folder' ? 'color:#ffa500;' : 'color:#666;';
         ?>
+
         <div class="file-grid-item" data-id="<?= $fileId ?>">
           <div class="file-grid-actions">
             <div class="action-dropdown">
@@ -491,26 +491,22 @@ if ($currentFolderId) {
                   <div class="dropdown-item">
                     <a href="download.php?file=<?= urlencode($minioKey) ?>">Download</a>
                   </div>
-                  <div class="dropdown-item move-trash" data-id="<?= $fileId ?>">Pindahkan ke Sampah</div>
-                  <div class="dropdown-item share" data-id="<?= $fileId ?>">Bagikan</div>
-                <?php else: ?>
-                  <div class="dropdown-item move-trash" data-id="<?= $fileId ?>">Pindahkan ke Sampah</div>
-                  <div class="dropdown-item disabled">Bagikan (Tidak tersedia)</div>
                 <?php endif; ?>
+                <div class="dropdown-item move-trash" data-id="<?= $fileId ?>">Pindahkan ke Sampah</div>
+                <div class="dropdown-item disabled">Bagikan (Tidak tersedia)</div>
               </div>
             </div>
           </div>
 
           <?php if ($fileType === 'folder'): ?>
-            <a href="?page=terbaru&folder=<?= $fileId ?>"
-              style="display:block; text-decoration:none; color:inherit; height:100%;">
+            <a href="?page=allfiles&folder=<?= $fileId ?>" style="display:block; text-decoration:none; color:inherit;">
             <?php else: ?>
               <div class="file-preview-trigger"
                 data-id="<?= $fileId ?>"
                 data-name="<?= $fileName ?>"
                 data-type="<?= $fileType ?>"
                 data-size="<?= $fileSize ?>"
-                style="display:block; height:100%; cursor:pointer;">
+                style="display:block;cursor:pointer;">
               <?php endif; ?>
 
               <div class="file-grid-icon <?= $fileType === 'folder' ? 'folder' : 'file' ?>">
@@ -530,32 +526,35 @@ if ($currentFolderId) {
           <?php else: ?>
         </div>
       <?php endif; ?>
-    <?php endforeach; ?>
-  <?php else: ?>
-    <div class="no-file" style="grid-column: 1 / -1; text-align:center; padding:40px;">
-      <img src="assets/img/not-file.png" alt="Tidak ada" width="150px" />
-      <p style="color:#999; margin-top:15px;">Belum ada file</p>
-    </div>
-  <?php endif; ?>
-  </div>
 
-  <!-- Floating Upload Button -->
-  <div class="fab-upload" id="fabUpload">
-    <button class="fab-main" id="fabToggle">
-      <i class="ri-add-line"></i>
+  </div> <!-- Tutup file-grid-item -->
+
+<?php endforeach; ?>
+<?php else: ?>
+  <div class="no-file" style="grid-column: 1 / -1; text-align:center; padding:40px;">
+    <img src="assets/img/not-file.png" alt="Tidak ada" width="150px" />
+    <p style="color:#999; margin-top:15px;">Belum ada file</p>
+  </div>
+<?php endif; ?>
+</div>
+
+<!-- Floating Upload Button -->
+<div class="fab-upload" id="fabUpload">
+  <button class="fab-main" id="fabToggle">
+    <i class="ri-add-line"></i>
+  </button>
+
+  <div class="fab-menu" id="fabMenu">
+    <button class="fab-item" id="fabUploadFile">
+      <i class="ri-file-2-line"></i> Upload File
     </button>
-
-    <div class="fab-menu" id="fabMenu">
-      <button class="fab-item" id="fabUploadFile">
-        <i class="ri-file-2-line"></i> Upload File
-      </button>
-      <button class="fab-item" id="fabUploadFolder">
-        <i class="ri-folder-upload-line"></i> Upload Folder
-      </button>
-      <button class="fab-item" id="fabCreateFolder">
-        <i class="ri-folder-add-line"></i> Buat Folder
-      </button>
-    </div>
+    <button class="fab-item" id="fabUploadFolder">
+      <i class="ri-folder-upload-line"></i> Upload Folder
+    </button>
+    <button class="fab-item" id="fabCreateFolder">
+      <i class="ri-folder-add-line"></i> Buat Folder
+    </button>
   </div>
+</div>
 
 </section>

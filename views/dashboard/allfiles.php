@@ -143,6 +143,10 @@ if ($currentFolderId) {
     overflow: hidden;
   }
 
+  .file-grid-item .dropdown-menu {
+    overflow: visible !important;
+  }
+
   .file-grid-item:hover {
     background: rgba(255, 255, 255, 0.12);
     transform: translateY(-3px);
