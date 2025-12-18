@@ -164,7 +164,7 @@ if (isset($_POST['changeLang'])) {
   $chosen = $_POST['changeLang'];   // id / en
   $_SESSION['lang'] = $chosen;
   $_SESSION['lang_data'] = $lang[$chosen];
-  header("Location: index.php?page=pengaturan");
+  // header("Location: index.php?page=pengaturan");
   exit;
 }
 
