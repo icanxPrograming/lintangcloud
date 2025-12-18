@@ -10,6 +10,131 @@ require_once __DIR__ . '/../core/Model.php';
 
 class FileModel extends Model
 {
+  // ========== TAMBAHKAN KONFIGURASI ==========
+  private $allowedExtensions = [
+    'pdf',
+    'doc',
+    'docx',
+    'txt',
+    'rtf',
+    'odt',
+    'xls',
+    'xlsx',
+    'csv',
+    'ods',
+    'ppt',
+    'pptx',
+    'odp',
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'bmp',
+    'svg',
+    'webp',
+    'ico',
+    'mp3',
+    'mp4',
+    'wav',
+    'avi',
+    'mov',
+    'mkv',
+    'flv',
+    'webm',
+    'zip',
+    'rar',
+    '7z',
+    'tar',
+    'gz',
+    'json',
+    'xml',
+    'html',
+    'css',
+    'js'
+  ];
+
+  private $blockedExtensions = [
+    'php',
+    'phtml',
+    'php3',
+    'php4',
+    'php5',
+    'php7',
+    'phps',
+    'php8',
+    'exe',
+    'bat',
+    'cmd',
+    'sh',
+    'bash',
+    'ps1',
+    'jsp',
+    'asp',
+    'aspx',
+    'pl',
+    'py',
+    'cgi',
+    'htaccess',
+    'htpasswd',
+    'dll',
+    'sys',
+    'vbs',
+    'scr',
+    'msi'
+  ];
+  // ===========================================
+
+  /**
+   * Validasi file sebelum insert ke database
+   */
+  private function validateFileData(array $data): array
+  {
+    $errors = [];
+
+    // Validasi untuk file (bukan folder)
+    if ($data['jenis_file'] !== 'folder') {
+      $filename = $data['nama_file'];
+      $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+      // Cek ekstensi berbahaya
+      if (in_array($extension, $this->blockedExtensions)) {
+        $errors[] = "Ekstensi .{$extension} tidak diizinkan karena alasan keamanan.";
+      }
+
+      // Cek ekstensi di allowlist
+      if (!in_array($extension, $this->allowedExtensions)) {
+        $errors[] = "Ekstensi .{$extension} tidak diizinkan.";
+      }
+
+      // Cek ukuran file (max 50MB)
+      $maxSize = 50 * 1024 * 1024;
+      if (isset($data['size']) && $data['size'] > $maxSize) {
+        $errors[] = "Ukuran file melebihi batas maksimal.";
+      }
+    }
+
+    return [
+      'valid' => empty($errors),
+      'errors' => $errors
+    ];
+  }
+
+  /**
+   * Get allowed extensions (untuk keperluan client-side jika diperlukan)
+   */
+  public function getAllowedExtensions(): array
+  {
+    return $this->allowedExtensions;
+  }
+
+  /**
+   * Get blocked extensions (untuk keperluan client-side jika diperlukan)
+   */
+  public function getBlockedExtensions(): array
+  {
+    return $this->blockedExtensions;
+  }
+
   /**
    * Mulai transaction
    */
@@ -116,6 +241,16 @@ class FileModel extends Model
         return false;
       }
     }
+
+    // ========== VALIDASI FILE DATA ==========
+    if ($data['jenis_file'] !== 'folder') {
+      $validation = $this->validateFileData($data);
+      if (!$validation['valid']) {
+        error_log("❌ File validation failed: " . implode(', ', $validation['errors']));
+        return false;
+      }
+    }
+    // =======================================
 
     // Set default values untuk field yang optional
     $data['parent_id'] = $data['parent_id'] ?? 0;

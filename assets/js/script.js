@@ -10,6 +10,118 @@ document.addEventListener("DOMContentLoaded", () => {
   const fileTableBody = document.getElementById("fileTableBody");
   const noFile = document.querySelector(".no-file");
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
+  // Tambahkan konfigurasi ekstensi
+  const ALLOWED_EXTENSIONS = [
+    // Dokumen
+    "pdf",
+    "doc",
+    "docx",
+    "txt",
+    "rtf",
+    "odt",
+    "xls",
+    "xlsx",
+    "csv",
+    "ods",
+    "ppt",
+    "pptx",
+    "odp",
+
+    // Gambar
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "bmp",
+    "svg",
+    "webp",
+    "ico",
+
+    // Media
+    "mp3",
+    "mp4",
+    "wav",
+    "avi",
+    "mov",
+    "mkv",
+    "flv",
+    "webm",
+
+    // Archive
+    "zip",
+    "rar",
+    "7z",
+    "tar",
+    "gz",
+
+    // Lainnya
+    "json",
+    "xml",
+    "html",
+    "css",
+    "js", // js diizinkan untuk dev
+  ];
+
+  const BLOCKED_EXTENSIONS = [
+    // Ekstensi berbahaya
+    "php",
+    "phtml",
+    "php3",
+    "php4",
+    "php5",
+    "php7",
+    "phps",
+    "php8",
+    "exe",
+    "bat",
+    "cmd",
+    "sh",
+    "bash",
+    "ps1",
+    "jsp",
+    "asp",
+    "aspx",
+    "pl",
+    "py",
+    "cgi",
+    "htaccess",
+    "htpasswd",
+    "dll",
+    "sys",
+    "vbs",
+    "scr",
+    "msi",
+  ];
+
+  // Fungsi validasi ekstensi
+  function isValidFileExtension(filename) {
+    const extension = getFileExtension(filename);
+
+    // Cek di blocklist dulu
+    if (BLOCKED_EXTENSIONS.includes(extension)) {
+      return {
+        valid: false,
+        message: `File dengan ekstensi .${extension} tidak diizinkan karena alasan keamanan!`,
+      };
+    }
+
+    // Cek di allowlist
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      return {
+        valid: false,
+        message: `Ekstensi .${extension} tidak diizinkan. Ekstensi yang diizinkan: ${ALLOWED_EXTENSIONS.join(
+          ", "
+        )}`,
+      };
+    }
+
+    return { valid: true };
+  }
+
+  function getFileExtension(filename) {
+    return filename.toLowerCase().split(".").pop();
+  }
+
   // ================== HAMBURGER MOBILE MENU ==================
   const hamburgerToggle = document.getElementById("hamburgerToggle");
   const mobileNav = document.getElementById("mobileNav");
@@ -852,6 +964,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Event listener untuk input file
   const uploadFileInput = document.getElementById("uploadFileInput");
+  // ===================== UPLOAD FILE ======================
   if (uploadFileInput) {
     uploadFileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
@@ -863,9 +976,19 @@ document.addEventListener("DOMContentLoaded", () => {
         `📤 Upload file "${file.name}" ke parent ID: ${currentParentId}`
       );
 
+      // ========== VALIDASI EKSTENSI ==========
+      const validation = isValidFileExtension(file.name);
+      if (!validation.valid) {
+        alert(validation.message);
+        uploadFileInput.value = "";
+        return;
+      }
+      // =======================================
+
       // validasi ukuran
       if (file.size > MAX_FILE_SIZE) {
         alert(`File terlalu besar! Maksimal ${MAX_FILE_SIZE / 1024 / 1024} MB`);
+        uploadFileInput.value = "";
         return;
       }
 
@@ -1209,19 +1332,62 @@ document.addEventListener("DOMContentLoaded", () => {
     const total = files.length;
     const uploadResults = [];
 
-    // Tampilkan progress container
-    const progressContainer = showUploadProgressFolder();
-
-    console.log(`🚀 Memulai upload ${total} file ke parent ID: ${parentId}`);
+    // Filter file yang valid
+    const validFiles = [];
+    const invalidFiles = [];
 
     files.forEach((file) => {
-      if (file.size > MAX_FILE_SIZE) {
-        console.warn(`❌ File "${file.name}" terlalu besar!`);
-        completed++;
-        checkCompletion();
+      const validation = isValidFileExtension(file.name);
+
+      if (!validation.valid) {
+        invalidFiles.push({
+          name: file.name,
+          reason: validation.message,
+        });
         return;
       }
 
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push({
+          name: file.name,
+          reason: `Ukuran file terlalu besar (maksimal ${
+            MAX_FILE_SIZE / 1024 / 1024
+          } MB)`,
+        });
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    // Tampilkan peringatan jika ada file yang tidak valid
+    if (invalidFiles.length > 0) {
+      const message =
+        `⚠️ ${invalidFiles.length} file tidak dapat diproses:\n\n` +
+        invalidFiles.map((f) => `• ${f.name}: ${f.reason}`).join("\n");
+
+      if (validFiles.length === 0) {
+        alert(message + "\n\nTidak ada file yang valid untuk diupload.");
+        uploadFolderInput.value = "";
+        return;
+      }
+
+      if (!confirm(message + "\n\nLanjutkan upload hanya file yang valid?")) {
+        uploadFolderInput.value = "";
+        return;
+      }
+    }
+
+    const validTotal = validFiles.length;
+
+    // Tampilkan progress container
+    const progressContainer = showUploadProgressFolder();
+
+    console.log(
+      `🚀 Memulai upload ${validTotal} file ke parent ID: ${parentId}`
+    );
+
+    validFiles.forEach((file) => {
       // Dapatkan struktur folder dari webkitRelativePath
       const relativePath = file.webkitRelativePath || file.name;
       const pathParts = relativePath
@@ -1231,7 +1397,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log(`📄 Processing: ${relativePath}, Parts:`, pathParts);
 
       // Update progress untuk file saat ini
-      updateUploadProgress(progressContainer, completed, total, file.name);
+      updateUploadProgress(progressContainer, completed, validTotal, file.name);
 
       if (pathParts.length > 1) {
         // File berada dalam subfolder
@@ -1272,23 +1438,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function checkCompletion() {
       // Update progress
-      updateUploadProgress(progressContainer, completed, total);
-      console.log(`📊 Progress: ${completed}/${total} files processed`);
+      updateUploadProgress(progressContainer, completed, validTotal);
+      console.log(`📊 Progress: ${completed}/${validTotal} files processed`);
 
-      if (completed === total) {
+      if (completed === validTotal) {
         setTimeout(() => {
           hideUploadProgress(progressContainer);
           optimizedStorageUpdate();
 
           const successCount = uploadResults.length;
           console.log(
-            `🎉 Upload selesai! ${successCount}/${total} file berhasil`
+            `🎉 Upload selesai! ${successCount}/${validTotal} file berhasil`
           );
 
-          showNotification(
-            `Upload selesai! ${successCount} dari ${total} file berhasil diupload.`,
-            successCount > 0 ? "success" : "warning"
-          );
+          // Tampilkan summary
+          let summary = `Upload selesai!\n`;
+          summary += `• Berhasil: ${successCount} file\n`;
+          summary += `• Gagal: ${validTotal - successCount} file\n`;
+          if (invalidFiles.length > 0) {
+            summary += `• Ditolak: ${invalidFiles.length} file (ekstensi/ukuran tidak valid)`;
+          }
+
+          showNotification(summary, successCount > 0 ? "success" : "warning");
 
           uploadFolderInput.value = "";
 
