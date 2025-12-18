@@ -436,6 +436,49 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
   .settings-btn-input:hover {
     background: rgba(255, 255, 255, 0.28);
   }
+
+  /* ================= LANGUAGE LOADING ================= */
+  .lang-loading-container {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 10px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  .lang-loading-container.show {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .lang-loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+    margin-right: 6px;
+  }
+
+  .lang-loading-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Container untuk select dan loading */
+  .language-select-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 18px;
+  }
 </style>
 <!-- ================= CSS SELESAI ================= -->
 
@@ -460,11 +503,16 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
       <label class="input-label"><?= $tr['language'] ?></label>
 
       <!-- FORM BAHASA DENGAN JAVASCRIPT HANDLER -->
-      <div style="margin-bottom: 18px;">
+      <div class="language-select-container">
         <select class="settings-select" id="languageSelect">
           <option value="id" <?= ($_SESSION['lang'] ?? 'id') == 'id' ? 'selected' : '' ?>>Indonesia</option>
           <option value="en" <?= ($_SESSION['lang'] ?? 'id') == 'en' ? 'selected' : '' ?>>English</option>
         </select>
+
+        <div class="lang-loading-container" id="langLoading">
+          <div class="lang-loading-spinner"></div>
+          <span class="lang-loading-text">Mengubah...</span>
+        </div>
       </div>
 
       <label class="input-label"><?= $tr['storage_limit'] ?? 'Batas Penyimpanan' ?></label>
@@ -488,12 +536,22 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
 <script>
   // Tampilkan pesan dari session jika ada
   <?php if (isset($_SESSION['save_success'])): ?>
-    alert('<?= $_SESSION['save_success'] ?>');
+    Swal.fire({
+      icon: 'success',
+      title: 'Berhasil!',
+      text: '<?= $_SESSION['save_success'] ?>',
+      timer: 2000,
+      showConfirmButton: false
+    });
     <?php unset($_SESSION['save_success']); ?>
   <?php endif; ?>
 
   <?php if (isset($_SESSION['save_error'])): ?>
-    alert('<?= $_SESSION['save_error'] ?>');
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: '<?= $_SESSION['save_error'] ?>'
+    });
     <?php unset($_SESSION['save_error']); ?>
   <?php endif; ?>
 
@@ -507,9 +565,18 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
   document.getElementById('languageSelect').addEventListener('change', function() {
     const lang = this.value;
     const loadingElement = document.getElementById('langLoading');
+    const selectElement = document.getElementById('languageSelect');
 
-    // Tampilkan loading
-    loadingElement.style.display = 'inline-block';
+    // Simpan nilai sebelum disable
+    const selectedValue = selectElement.value;
+
+    // Tampilkan loading spinner
+    loadingElement.classList.add('show');
+
+    // Nonaktifkan select sementara
+    selectElement.disabled = true;
+    selectElement.style.opacity = '0.6';
+    selectElement.style.cursor = 'not-allowed';
 
     // Buat form dinamis untuk submit
     const form = document.createElement('form');
@@ -527,12 +594,16 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
     // Submit form
     form.submit();
 
-    // Fallback: reload setelah beberapa detik
+    // Fallback: jika form submit gagal, reload setelah beberapa detik
     setTimeout(() => {
-      location.reload();
-    }, 2000);
+      // Hanya reload jika halaman belum redirect
+      if (document.body.contains(loadingElement)) {
+        location.reload();
+      }
+    }, 3000);
   });
 
+  // Fungsi untuk simpan pengaturan
   function saveSettings() {
     const name = document.getElementById('inputName').value;
     const email = document.getElementById('inputEmail').value;
@@ -541,68 +612,96 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
 
     // Validasi sederhana
     if (!name || !email) {
-      alert('Nama dan Email wajib diisi!');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Peringatan',
+        text: 'Nama dan Email wajib diisi!'
+      });
       return;
     }
 
-    // Buat form dinamis
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '';
-
-    const fields = [{
-        name: 'save_settings',
-        value: '1'
-      },
-      {
-        name: 'name',
-        value: name
-      },
-      {
-        name: 'email',
-        value: email
-      },
-      {
-        name: 'storage_limit',
-        value: storageLimit
+    // Tampilkan loading sweetalert
+    Swal.fire({
+      title: 'Menyimpan...',
+      text: 'Sedang menyimpan pengaturan',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
       }
-    ];
-
-    if (password) {
-      fields.push({
-        name: 'password',
-        value: password
-      });
-    }
-
-    fields.forEach(field => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = field.name;
-      input.value = field.value;
-      form.appendChild(input);
     });
 
-    document.body.appendChild(form);
-    form.submit();
+    // Kirim dengan AJAX untuk feedback yang lebih baik
+    const formData = new FormData();
+    formData.append('save_settings', '1');
+    formData.append('name', name);
+    formData.append('email', email);
+    formData.append('storage_limit', storageLimit);
+    if (password) formData.append('password', password);
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.text())
+      .then(data => {
+        Swal.close();
+        // Reload halaman
+        location.reload();
+      })
+      .catch(error => {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Terjadi kesalahan saat menyimpan: ' + error.message
+        });
+      });
   }
 
+  // Fungsi untuk reset pengaturan
   function resetSettings() {
-    if (!confirm('Apakah Anda yakin ingin mereset pengaturan ke default?')) {
-      return;
-    }
+    Swal.fire({
+      title: 'Reset Pengaturan?',
+      text: "Semua pengaturan akan dikembalikan ke default. Password akan direset ke 'admin123'",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Ya, Reset!',
+      cancelButtonText: 'Batal'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Tampilkan loading
+        Swal.fire({
+          title: 'Mereset...',
+          text: 'Sedang mereset pengaturan',
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '';
+        // Kirim dengan AJAX
+        const formData = new FormData();
+        formData.append('reset_settings', '1');
 
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'reset_settings';
-    input.value = '1';
-
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+          })
+          .then(response => response.text())
+          .then(data => {
+            Swal.close();
+            // Reload halaman
+            location.reload();
+          })
+          .catch(error => {
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: 'Terjadi kesalahan saat reset: ' + error.message
+            });
+          });
+      }
+    });
   }
 </script>
