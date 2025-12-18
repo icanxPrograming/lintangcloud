@@ -1242,7 +1242,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const uploadFolderInput = document.getElementById("uploadFolderInput");
   if (uploadFolderInput) {
-    uploadFolderInput.addEventListener("change", (e) => {
+    uploadFolderInput.addEventListener("change", async (e) => {
       const files = Array.from(e.target.files);
       if (!files.length) return;
 
@@ -1252,24 +1252,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
       uploadDropdown.style.display = "none";
 
-      // Validasi semua file sebelum proses
-      const validationResult = validateFolderFiles(files);
+      // Validasi semua file sebelum proses - MENGGUNAKAN ASYNC/AWAIT
+      const validationResult = await validateFolderFiles(files);
 
       if (!validationResult.proceed) {
         uploadFolderInput.value = "";
         return;
       }
 
-      // Process files with folder structure (menggunakan fungsi yang sudah ada)
+      // Process files with folder structure
       processFolderUpload(validationResult.validFiles, currentParentId);
     });
   }
 
-  // Fungsi validasi file folder
-  function validateFolderFiles(files) {
+  // Fungsi validasi file folder - DIUBAH MENJADI ASYNC
+  async function validateFolderFiles(files) {
     const validFiles = [];
     const invalidFiles = [];
 
+    // Validasi setiap file
     files.forEach((file) => {
       const validation = isValidFileExtension(file.name);
 
@@ -1294,53 +1295,71 @@ document.addEventListener("DOMContentLoaded", () => {
       validFiles.push(file);
     });
 
-    // Tampilkan peringatan jika ada file yang tidak valid
+    // Jika ada file yang tidak valid, tampilkan konfirmasi SWEETALERT2
     if (invalidFiles.length > 0) {
-      const message =
-        `⚠️ ${invalidFiles.length} file tidak dapat diproses:\n\n` +
-        invalidFiles
-          .slice(0, 5)
-          .map((f) => `• ${f.name}`)
-          .join("\n");
+      // Buat list file yang tidak valid (maksimal 10 file)
+      const invalidList = invalidFiles
+        .slice(0, 10)
+        .map((f, i) => `${i + 1}. ${f.name}`)
+        .join("<br>");
 
       const moreText =
-        invalidFiles.length > 5
-          ? `\n...dan ${invalidFiles.length - 5} file lainnya`
+        invalidFiles.length > 10
+          ? `<br>...dan ${invalidFiles.length - 10} file lainnya`
           : "";
 
-      // Gunakan SweetAlert2 untuk konfirmasi
-      Swal.fire({
-        title: "File Tidak Valid Ditemukan",
-        html: `${invalidFiles.length} file tidak dapat diproses:<br><br>
-             <small>${message}${moreText}</small><br><br>
-             <strong>Lanjutkan upload ${validFiles.length} file yang valid?</strong>`,
+      // Tampilkan SweetAlert2 dan TUNGGU KONFIRMASI USER
+      const result = await Swal.fire({
+        title: "⚠️ File Tidak Valid Ditemukan",
+        html: `<div style="text-align: left;">
+               <p><strong>${invalidFiles.length} dari ${files.length} file tidak dapat diproses:</strong></p>
+               <div style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 13px;">
+                 ${invalidList}${moreText}
+               </div>
+               <p>File ditolak karena: <strong>ekstensi tidak diizinkan atau ukuran terlalu besar</strong>.</p>
+               <p><strong>Lanjutkan upload ${validFiles.length} file yang valid?</strong></p>
+             </div>`,
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#4a6cf7",
         cancelButtonColor: "#6c757d",
         confirmButtonText: "Ya, Lanjutkan",
         cancelButtonText: "Batalkan",
+        width: "600px",
         customClass: {
           popup: "custom-swal-popup",
+          htmlContainer: "text-left",
         },
-      }).then((result) => {
-        if (result.isConfirmed) {
-          if (validFiles.length === 0) {
-            showError("Tidak ada file yang valid untuk diupload!");
-            uploadFolderInput.value = "";
-            return { proceed: false };
-          }
-          return { proceed: true, validFiles, invalidFiles };
-        } else {
-          uploadFolderInput.value = "";
-          return { proceed: false };
-        }
       });
+
+      // Jika user membatalkan
+      if (!result.isConfirmed) {
+        return {
+          proceed: false,
+          validFiles: [],
+          invalidFiles,
+        };
+      }
+
+      // Jika tidak ada file yang valid setelah konfirmasi
+      if (validFiles.length === 0) {
+        await showError("Tidak ada file yang valid untuk diupload!");
+        return {
+          proceed: false,
+          validFiles: [],
+          invalidFiles,
+        };
+      }
     }
 
+    // Jika tidak ada file yang valid sama sekali (tanpa konfirmasi)
     if (validFiles.length === 0) {
-      showError("Tidak ada file yang valid untuk diupload!");
-      return { proceed: false };
+      await showError("Tidak ada file yang valid untuk diupload!");
+      return {
+        proceed: false,
+        validFiles: [],
+        invalidFiles,
+      };
     }
 
     return {
