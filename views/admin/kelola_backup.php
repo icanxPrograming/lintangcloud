@@ -728,23 +728,48 @@ $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
     Swal.fire({
       title: 'Unduh Backup Lokal',
       html: `<p>Download backup <b>"${backupName}"</b> ke komputer Anda?</p>
-             <p><small>Backup akan diunduh sebagai file ZIP.</small></p>`,
+               <p><small>Backup akan diunduh sebagai file ZIP.</small></p>`,
       icon: 'info',
       showCancelButton: true,
       confirmButtonText: 'Ya, Unduh',
       cancelButtonText: 'Batal'
     }).then((result) => {
       if (result.isConfirmed) {
-        // Buka tab baru untuk download
-        const url = `backup_action.php?action=download_local&backup_name=${encodeURIComponent(backupName)}`;
-        window.open(url, '_blank');
+        // Buat form tersembunyi
+        const form = document.createElement('form');
+        form.method = 'GET';
+        form.action = 'backup_action.php';
+        form.target = '_blank';
+        form.style.display = 'none';
+
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'download_local';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'hidden';
+        nameInput.name = 'backup_name';
+        nameInput.value = backupName;
+
+        form.appendChild(actionInput);
+        form.appendChild(nameInput);
+        document.body.appendChild(form);
+
+        // Submit form
+        form.submit();
+
+        // Hapus form setelah submit
+        setTimeout(() => {
+          document.body.removeChild(form);
+        }, 100);
 
         // Beri notifikasi
         Swal.fire({
-          title: 'Memulai Download',
-          text: 'Download telah dimulai. Periksa tab/download browser Anda.',
+          title: 'Download Dimulai',
+          text: 'File sedang diproses. Periksa download browser Anda.',
           icon: 'success',
-          timer: 3000,
+          timer: 2000,
           showConfirmButton: false
         });
       }

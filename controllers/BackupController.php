@@ -312,16 +312,25 @@ class BackupController
             $mappings = json_decode($existing, true) ?: [];
         }
 
+        // Gunakan URL-safe encoding
+        $encryptedPath = str_replace(['+', '/'], ['-', '_'], base64_encode($localPath));
+
         $mappings[$backupName] = [
             'local_path' => $localPath,
             'created' => date('Y-m-d H:i:s'),
-            'encrypted_path' => base64_encode($localPath)
+            'encrypted_path' => $encryptedPath,
+            'size' => $this->getDirectorySize($localPath)
         ];
 
-        file_put_contents($mappingFile, json_encode($mappings, JSON_PRETTY_PRINT));
+        // Tulis dengan locking untuk menghindari race condition
+        $result = file_put_contents($mappingFile, json_encode($mappings, JSON_PRETTY_PRINT), LOCK_EX);
 
-        // Set permission yang ketat
-        chmod($mappingFile, 0600);
+        if ($result === false) {
+            error_log("ERROR: Gagal menulis mapping file: " . $mappingFile);
+        } else {
+            // Set permission yang lebih longgar (640)
+            chmod($mappingFile, 0640);
+        }
     }
 
     // Hapus direktori rekursif
@@ -362,14 +371,21 @@ class BackupController
         $mappings = json_decode(file_get_contents($mappingFile), true);
 
         if (!isset($mappings[$backupName]['encrypted_path'])) {
-            return ['success' => false, 'message' => 'Backup lokal tidak ditemukan'];
+            return ['success' => false, 'message' => "Backup lokal '{$backupName}' tidak ditemukan"];
         }
 
         $localPath = base64_decode($mappings[$backupName]['encrypted_path']);
 
         if (!file_exists($localPath)) {
-            return ['success' => false, 'message' => 'Folder backup tidak ditemukan'];
+            return [
+                'success' => false,
+                'message' => "Folder backup '{$backupName}' tidak ditemukan di: " . $localPath
+            ];
         }
+
+        // Debug: cek isi folder
+        $files = scandir($localPath);
+        error_log("DEBUG - Isi folder {$localPath}: " . print_r($files, true));
 
         // Buat zip dari folder backup
         $zipFile = $this->createZipBackup($localPath, $backupName);
@@ -378,42 +394,106 @@ class BackupController
             return [
                 'success' => true,
                 'zip_file' => $zipFile,
-                'backup_name' => $backupName
+                'backup_name' => $backupName,
+                'zip_size' => filesize($zipFile)
             ];
         }
 
-        return ['success' => false, 'message' => 'Gagal membuat file zip'];
+        return [
+            'success' => false,
+            'message' => 'Gagal membuat file ZIP. Pastikan folder backup tidak kosong.'
+        ];
     }
 
     // Buat ZIP dari folder backup
     private function createZipBackup($folderPath, $backupName)
     {
         if (!class_exists('ZipArchive')) {
+            error_log("ERROR: ZipArchive extension tidak tersedia");
+            return false;
+        }
+
+        // Normalize folder path
+        $folderPath = rtrim($folderPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+
+        // Cek apakah folder ada dan bisa diakses
+        if (!is_dir($folderPath) || !is_readable($folderPath)) {
+            error_log("ERROR: Folder tidak bisa diakses: " . $folderPath);
+            return false;
+        }
+
+        // Cek apakah folder kosong
+        $files = array_diff(scandir($folderPath), ['.', '..']);
+        if (empty($files)) {
+            error_log("ERROR: Folder backup kosong: " . $folderPath);
             return false;
         }
 
         $zip = new ZipArchive();
-        $zipFileName = $this->localBackupPath . $backupName . '.zip';
+        // Gunakan path temp untuk file ZIP
+        $tempDir = sys_get_temp_dir();
+        $zipFileName = $tempDir . DIRECTORY_SEPARATOR . $backupName . '_' . time() . '.zip';
 
-        if ($zip->open($zipFileName, ZipArchive::CREATE) === TRUE) {
-            $files = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($folderPath),
-                RecursiveIteratorIterator::LEAVES_ONLY
+        error_log("DEBUG: Membuat ZIP di: " . $zipFileName);
+
+        if ($zip->open($zipFileName, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+            error_log("ERROR: Gagal membuka/membuat file ZIP: " . $zipFileName);
+            return false;
+        }
+
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($folderPath, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
             );
 
-            foreach ($files as $name => $file) {
-                if (!$file->isDir()) {
-                    $filePath = $file->getRealPath();
-                    $relativePath = substr($filePath, strlen($folderPath));
-                    $zip->addFile($filePath, $relativePath);
+            $addedFiles = 0;
+            foreach ($iterator as $file) {
+                if ($file->isDir()) {
+                    // Buat directory entry di ZIP
+                    $relativePath = str_replace($folderPath, '', $file->getPathname()) . '/';
+                    $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', $relativePath); // Normalize separator
+                    $zip->addEmptyDir($relativePath);
+                    error_log("DEBUG: Menambah folder: " . $relativePath);
+                } else {
+                    // Tambah file ke ZIP
+                    $filePath = $file->getPathname();
+                    $relativePath = str_replace($folderPath, '', $filePath);
+                    $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', $relativePath); // Normalize separator
+
+                    if ($zip->addFile($filePath, $relativePath)) {
+                        $addedFiles++;
+                        error_log("DEBUG: Menambah file: " . $relativePath . " (" . $file->getSize() . " bytes)");
+                    } else {
+                        error_log("WARNING: Gagal menambah file: " . $relativePath);
+                    }
                 }
             }
 
             $zip->close();
-            return $zipFileName;
-        }
 
-        return false;
+            if ($addedFiles === 0) {
+                error_log("ERROR: Tidak ada file yang berhasil ditambahkan ke ZIP");
+                unlink($zipFileName);
+                return false;
+            }
+
+            // Verifikasi ZIP
+            if (!file_exists($zipFileName) || filesize($zipFileName) === 0) {
+                error_log("ERROR: File ZIP gagal dibuat atau kosong");
+                return false;
+            }
+
+            error_log("SUCCESS: ZIP berhasil dibuat: " . $zipFileName . " (" . filesize($zipFileName) . " bytes)");
+            return $zipFileName;
+        } catch (Exception $e) {
+            error_log("ERROR Exception: " . $e->getMessage());
+            $zip->close();
+            if (file_exists($zipFileName)) {
+                unlink($zipFileName);
+            }
+            return false;
+        }
     }
 
     // Cleanup backup lokal yang sudah tua (hanya untuk admin)

@@ -2,119 +2,104 @@
 require_once 'config/Session.php';
 require_once __DIR__ . '/controllers/BackupController.php';
 
-// Start output buffering
-ob_start();
-
-Session::checkLogin();
-
-$action = $_POST['action'] ?? $_GET['action'] ?? null;
-$id_backup = isset($_POST['id_backup']) ? (int) $_POST['id_backup'] : (isset($_GET['id_backup']) ? (int) $_GET['id_backup'] : null);
-$backup_name = $_POST['backup_name'] ?? $_GET['backup_name'] ?? null;
-$days = isset($_POST['days']) ? (int) $_POST['days'] : (isset($_GET['days']) ? (int) $_GET['days'] : 30);
-
-$id_user = $_SESSION['id_user'] ?? null;
-if (!$id_user) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+// Helper functions
+function sendJson($data)
+{
+    ob_end_clean();
+    header('Content-Type: application/json');
+    echo json_encode($data);
     exit;
 }
 
+function downloadFile($filePath, $filename)
+{
+    ob_end_clean();
+
+    if (!file_exists($filePath)) {
+        sendJson(['success' => false, 'message' => 'File tidak ditemukan']);
+    }
+
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . filesize($filePath));
+    readfile($filePath);
+
+    // Cleanup
+    if (file_exists($filePath) && strpos($filePath, sys_get_temp_dir()) === 0) {
+        unlink($filePath);
+    }
+
+    exit;
+}
+
+// Main execution
+ob_start();
+Session::checkLogin();
+
+$id_user = $_SESSION['id_user'] ?? null;
+if (!$id_user) {
+    sendJson(['success' => false, 'message' => 'Unauthorized']);
+}
+
+$action = $_POST['action'] ?? $_GET['action'] ?? null;
 $controller = new BackupController();
-$response = [];
 
 try {
     switch ($action) {
         case 'create':
-            $response = $controller->create();
-            break;
+            sendJson($controller->create());
 
         case 'restore':
-            if ($id_backup) {
-                $response = $controller->restore($id_backup);
-            } else {
-                $response = ['success' => false, 'message' => 'Backup ID required'];
+            $id_backup = (int) ($_POST['id_backup'] ?? $_GET['id_backup'] ?? 0);
+            if (!$id_backup) {
+                sendJson(['success' => false, 'message' => 'Backup ID required']);
             }
-            break;
+            sendJson($controller->restore($id_backup));
 
         case 'delete':
-            if ($id_backup) {
-                $response = $controller->delete($id_backup);
-            } else {
-                $response = ['success' => false, 'message' => 'Backup ID required'];
+            $id_backup = (int) ($_POST['id_backup'] ?? $_GET['id_backup'] ?? 0);
+            if (!$id_backup) {
+                sendJson(['success' => false, 'message' => 'Backup ID required']);
             }
-            break;
+            sendJson($controller->delete($id_backup));
 
-        // ========== DOWNLOAD LOCAL - SPECIAL HANDLING ==========
         case 'download_local':
             // Hanya untuk admin
             if (($_SESSION['role'] ?? '') !== 'admin') {
-                $response = ['success' => false, 'message' => 'Akses ditolak'];
-                break;
+                sendJson(['success' => false, 'message' => 'Akses ditolak']);
             }
 
+            $backup_name = $_POST['backup_name'] ?? $_GET['backup_name'] ?? '';
             if (!$backup_name) {
-                $response = ['success' => false, 'message' => 'Backup name required'];
-                break;
+                sendJson(['success' => false, 'message' => 'Backup name required']);
             }
-
-            // Clear buffer untuk file download
-            ob_end_clean();
 
             $result = $controller->downloadLocalBackup($backup_name);
 
             if ($result['success'] && isset($result['zip_file'])) {
-                $zipFile = $result['zip_file'];
-
-                if (!file_exists($zipFile)) {
-                    header('Content-Type: application/json');
-                    echo json_encode(['success' => false, 'message' => 'File ZIP tidak ditemukan']);
-                    exit;
-                }
-
-                // Send file
-                header('Content-Type: application/zip');
-                header('Content-Disposition: attachment; filename="' . $backup_name . '.zip"');
-                header('Content-Length: ' . filesize($zipFile));
-                readfile($zipFile);
-
-                // Cleanup
-                if (file_exists($zipFile)) {
-                    unlink($zipFile);
-                }
-
-                exit;
-            } else {
-                $response = $result;
+                downloadFile($result['zip_file'], $backup_name . '.zip');
             }
-            break;
+            sendJson($result);
 
         case 'cleanup_local':
             if (($_SESSION['role'] ?? '') !== 'admin') {
-                $response = ['success' => false, 'message' => 'Akses ditolak'];
-                break;
+                sendJson(['success' => false, 'message' => 'Akses ditolak']);
             }
-            $response = $controller->cleanupLocalBackups($days);
-            break;
+            $days = (int) ($_POST['days'] ?? $_GET['days'] ?? 30);
+            sendJson($controller->cleanupLocalBackups($days));
 
         case 'list_local':
             if (($_SESSION['role'] ?? '') !== 'admin') {
-                $response = ['success' => false, 'message' => 'Akses ditolak'];
-                break;
+                sendJson(['success' => false, 'message' => 'Akses ditolak']);
             }
-            $response = $controller->listLocalBackups();
-            break;
+            sendJson($controller->listLocalBackups());
 
         default:
-            $response = ['success' => false, 'message' => 'Invalid action'];
-            break;
+            sendJson(['success' => false, 'message' => 'Invalid action']);
     }
 } catch (Exception $e) {
-    $response = [
+    sendJson([
         'success' => false,
         'message' => 'Terjadi error: ' . $e->getMessage()
-    ];
+    ]);
 }
-
-// Hanya untuk non-download actions
-ob_end_clean();
-header('Content-Type: application/json');
-echo json_encode($response);
