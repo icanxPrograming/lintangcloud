@@ -465,9 +465,6 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
           <option value="id" <?= ($_SESSION['lang'] ?? 'id') == 'id' ? 'selected' : '' ?>>Indonesia</option>
           <option value="en" <?= ($_SESSION['lang'] ?? 'id') == 'en' ? 'selected' : '' ?>>English</option>
         </select>
-        <span id="langLoading" class="lang-loading">
-          <i class="ri-loader-4-line"></i> Mengubah...
-        </span>
       </div>
 
       <label class="input-label"><?= $tr['storage_limit'] ?? 'Batas Penyimpanan' ?></label>
