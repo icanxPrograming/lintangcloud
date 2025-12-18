@@ -158,93 +158,98 @@ $lang = [
 ];
 
 /* =====================================
-   JIKA USER GANTI BAHASA DARI DROPDOWN
-   (Hanya proses, tidak redirect di sini)
+   HANDLE POST REQUESTS - SEBELUM OUTPUT APAPUN
 ===================================== */
-if (isset($_POST['changeLang']) && !headers_sent()) {
-  $chosen = $_POST['changeLang'];
-  $_SESSION['lang'] = $chosen;
-  $_SESSION['lang_data'] = $lang[$chosen];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-  // Simpan untuk JavaScript redirect
-  $_SESSION['needs_redirect'] = true;
-  $_SESSION['redirect_url'] = 'index.php?page=pengaturan';
-}
+  // 1. Handle Language Change
+  if (isset($_POST['changeLang'])) {
+    $chosen = $_POST['changeLang'];
 
-/* =====================================
-   PROSES SIMPAN PERUBAHAN
-===================================== */
-if (isset($_POST['save_settings'])) {
-  $name = trim($_POST['name'] ?? '');
-  $email = trim($_POST['email'] ?? '');
-  $storage_input = trim($_POST['storage_limit'] ?? '');
+    // Validasi bahasa
+    if (isset($lang[$chosen])) {
+      $_SESSION['lang'] = $chosen;
+      $_SESSION['lang_data'] = $lang[$chosen];
 
-  // Validasi input
-  if (empty($name) || empty($email)) {
-    echo "<script>alert('Nama dan Email wajib diisi!');</script>";
-  } else {
-    // Konversi input storage_limit ke byte
-    $storage_limit = null;
-    if (is_numeric($storage_input)) {
-      // Jika langsung angka, anggap itu GB
-      $storage_limit = (int) $storage_input * (1024 ** 3); // Konversi ke byte
-    } else {
-      // Jika ada huruf seperti "10 GB", ambil angkanya
-      $number = preg_replace('/[^0-9.]/', '', $storage_input);
-      if (is_numeric($number)) {
-        $storage_limit = (int) ($number * (1024 ** 3));
+      // Redirect menggunakan JavaScript jika headers sudah dikirim
+      if (!headers_sent()) {
+        header("Location: index.php?page=pengaturan");
+        exit;
       } else {
-        echo "<script>alert('Format storage limit tidak valid!');</script>";
-        $storage_limit = null;
-      }
-    }
-
-    if ($storage_limit !== null) {
-      try {
-        // Siapkan query dasar
-        $sql = "UPDATE tuser SET full_name = ?, email = ?, storage_limit = ? WHERE id_user = 1 AND role = 'admin'";
-        $params = [$name, $email, $storage_limit];
-
-        // Jika password diisi, hash dan tambahkan ke query
-        if (!empty($_POST['password'])) {
-          $hashed_password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-          $sql = "UPDATE tuser SET full_name = ?, email = ?, storage_limit = ?, password = ? WHERE id_user = 1 AND role = 'admin'";
-          $params[] = $hashed_password;
-        }
-
-        $stmt = Koneksi::getConnection()->prepare($sql);
-        $stmt->execute($params);
-
-        // Ambil ulang data setelah update
-        $stmt = Koneksi::getConnection()->prepare("SELECT * FROM tuser WHERE id_user = 1 AND role = 'admin'");
-        $stmt->execute();
-        $admin_data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        echo "<script>alert('Pengaturan berhasil disimpan!');</script>";
-      } catch (PDOException $e) {
-        echo "<script>alert('Error: " . addslashes($e->getMessage()) . "');</script>";
+        // Fallback: simpan flag untuk JavaScript redirect
+        $_SESSION['needs_redirect'] = true;
       }
     }
   }
-}
 
-/* =====================================
-   PROSES RESET KE DEFAULT
-===================================== */
-if (isset($_POST['reset_settings'])) {
-  try {
-    $stmt = Koneksi::getConnection()->prepare("UPDATE tuser SET full_name = 'Admin', email = 'admin@localhost', storage_limit = 2147483648, password = ? WHERE id_user = 1 AND role = 'admin'");
-    $default_password_hash = password_hash('admin123', PASSWORD_DEFAULT);
-    $stmt->execute([$default_password_hash]);
+  // 2. Handle Save Settings
+  if (isset($_POST['save_settings'])) {
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $storage_input = trim($_POST['storage_limit'] ?? '');
 
-    // Ambil ulang data
-    $stmt = Koneksi::getConnection()->prepare("SELECT * FROM tuser WHERE id_user = 1 AND role = 'admin'");
-    $stmt->execute();
-    $admin_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Validasi input
+    if (empty($name) || empty($email)) {
+      $_SESSION['save_error'] = 'Nama dan Email wajib diisi!';
+    } else {
+      // Konversi storage limit
+      $storage_limit = null;
+      if (is_numeric($storage_input)) {
+        $storage_limit = (int) $storage_input * (1024 ** 3);
+      } else {
+        $number = preg_replace('/[^0-9.]/', '', $storage_input);
+        if (is_numeric($number)) {
+          $storage_limit = (int) ($number * (1024 ** 3));
+        }
+      }
 
-    echo "<script>alert('Pengaturan berhasil direset ke default!');</script>";
-  } catch (PDOException $e) {
-    echo "<script>alert('Error saat reset: " . addslashes($e->getMessage()) . "');</script>";
+      if ($storage_limit !== null) {
+        try {
+          $sql = "UPDATE tuser SET full_name = ?, email = ?, storage_limit = ? WHERE id_user = 1 AND role = 'admin'";
+          $params = [$name, $email, $storage_limit];
+
+          if (!empty($_POST['password'])) {
+            $hashed_password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+            $sql = "UPDATE tuser SET full_name = ?, email = ?, storage_limit = ?, password = ? WHERE id_user = 1 AND role = 'admin'";
+            $params[] = $hashed_password;
+          }
+
+          $stmt = Koneksi::getConnection()->prepare($sql);
+          $stmt->execute($params);
+
+          $_SESSION['save_success'] = 'Pengaturan berhasil disimpan!';
+        } catch (PDOException $e) {
+          $_SESSION['save_error'] = 'Error: ' . $e->getMessage();
+        }
+      } else {
+        $_SESSION['save_error'] = 'Format storage limit tidak valid!';
+      }
+    }
+
+    // Redirect untuk menghindari form resubmission
+    if (!headers_sent()) {
+      header("Location: index.php?page=pengaturan");
+      exit;
+    }
+  }
+
+  // 3. Handle Reset Settings
+  if (isset($_POST['reset_settings'])) {
+    try {
+      $stmt = Koneksi::getConnection()->prepare("UPDATE tuser SET full_name = 'Admin', email = 'admin@localhost', storage_limit = 2147483648, password = ? WHERE id_user = 1 AND role = 'admin'");
+      $default_password_hash = password_hash('admin123', PASSWORD_DEFAULT);
+      $stmt->execute([$default_password_hash]);
+
+      $_SESSION['save_success'] = 'Pengaturan berhasil direset ke default!';
+    } catch (PDOException $e) {
+      $_SESSION['save_error'] = 'Error saat reset: ' . $e->getMessage();
+    }
+
+    // Redirect
+    if (!headers_sent()) {
+      header("Location: index.php?page=pengaturan");
+      exit;
+    }
   }
 }
 
@@ -454,13 +459,16 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
 
       <label class="input-label"><?= $tr['language'] ?></label>
 
-      <!-- FORM BAHASA -->
-      <form method="POST" style="margin-bottom: 18px;">
-        <select class="settings-select" name="changeLang" onchange="this.form.submit()">
+      <!-- FORM BAHASA DENGAN JAVASCRIPT HANDLER -->
+      <div style="margin-bottom: 18px;">
+        <select class="settings-select" id="languageSelect">
           <option value="id" <?= ($_SESSION['lang'] ?? 'id') == 'id' ? 'selected' : '' ?>>Indonesia</option>
           <option value="en" <?= ($_SESSION['lang'] ?? 'id') == 'en' ? 'selected' : '' ?>>English</option>
         </select>
-      </form>
+        <span id="langLoading" class="lang-loading">
+          <i class="ri-loader-4-line"></i> Mengubah...
+        </span>
+      </div>
 
       <label class="input-label"><?= $tr['storage_limit'] ?? 'Batas Penyimpanan' ?></label>
       <input type="text" class="settings-input" id="inputStorageLimit" placeholder="Contoh: 10 (dalam GB)"
@@ -481,21 +489,35 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
 </div>
 
 <script>
-  // Cek jika perlu redirect setelah change language
-  <?php if (isset($_SESSION['needs_redirect']) && $_SESSION['needs_redirect']): ?>
-    window.location.href = '<?= $_SESSION['redirect_url'] ?>';
-    <?php
-    unset($_SESSION['needs_redirect']);
-    unset($_SESSION['redirect_url']);
-    ?>
+  // Tampilkan pesan dari session jika ada
+  <?php if (isset($_SESSION['save_success'])): ?>
+    alert('<?= $_SESSION['save_success'] ?>');
+    <?php unset($_SESSION['save_success']); ?>
   <?php endif; ?>
 
-  // Fungsi untuk ganti bahasa dengan form submit
-  function changeLanguage(lang) {
-    // Buat form dinamis
+  <?php if (isset($_SESSION['save_error'])): ?>
+    alert('<?= $_SESSION['save_error'] ?>');
+    <?php unset($_SESSION['save_error']); ?>
+  <?php endif; ?>
+
+  // Redirect jika ada flag dari PHP
+  <?php if (isset($_SESSION['needs_redirect']) && $_SESSION['needs_redirect']): ?>
+    window.location.href = 'index.php?page=pengaturan';
+    <?php unset($_SESSION['needs_redirect']); ?>
+  <?php endif; ?>
+
+  // Fungsi untuk ganti bahasa dengan AJAX
+  document.getElementById('languageSelect').addEventListener('change', function() {
+    const lang = this.value;
+    const loadingElement = document.getElementById('langLoading');
+
+    // Tampilkan loading
+    loadingElement.style.display = 'inline-block';
+
+    // Buat form dinamis untuk submit
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = ''; // Submit ke halaman yang sama
+    form.action = '';
 
     const input = document.createElement('input');
     input.type = 'hidden';
@@ -504,8 +526,15 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
 
     form.appendChild(input);
     document.body.appendChild(form);
+
+    // Submit form
     form.submit();
-  }
+
+    // Fallback: reload setelah beberapa detik
+    setTimeout(() => {
+      location.reload();
+    }, 2000);
+  });
 
   function saveSettings() {
     const name = document.getElementById('inputName').value;
@@ -519,30 +548,46 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
       return;
     }
 
-    // Kirim data ke server via fetch
-    const formData = new FormData();
-    formData.append('save_settings', '1');
-    formData.append('name', name);
-    formData.append('email', email);
-    formData.append('password', password);
-    formData.append('storage_limit', storageLimit);
+    // Buat form dinamis
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '';
 
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData
-      })
-      .then(response => response.text())
-      .then(data => {
-        // Tampilkan alert bahwa data berhasil disimpan
-        alert('Pengaturan berhasil disimpan!');
+    const fields = [{
+        name: 'save_settings',
+        value: '1'
+      },
+      {
+        name: 'name',
+        value: name
+      },
+      {
+        name: 'email',
+        value: email
+      },
+      {
+        name: 'storage_limit',
+        value: storageLimit
+      }
+    ];
 
-        // Reload halaman agar data terbaru muncul
-        location.reload();
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Terjadi kesalahan saat menyimpan pengaturan.');
+    if (password) {
+      fields.push({
+        name: 'password',
+        value: password
       });
+    }
+
+    fields.forEach(field => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = field.name;
+      input.value = field.value;
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
   }
 
   function resetSettings() {
@@ -550,24 +595,17 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
       return;
     }
 
-    const formData = new FormData();
-    formData.append('reset_settings', '1');
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '';
 
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData
-      })
-      .then(response => response.text())
-      .then(data => {
-        // Tampilkan alert bahwa data berhasil direset
-        alert('Pengaturan berhasil direset ke default!');
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'reset_settings';
+    input.value = '1';
 
-        // Reload halaman agar data terbaru muncul
-        location.reload();
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Terjadi kesalahan saat mereset pengaturan.');
-      });
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
   }
 </script>
