@@ -1252,7 +1252,7 @@ document.addEventListener("DOMContentLoaded", () => {
       uploadDropdown.style.display = "none";
 
       // Validasi semua file sebelum proses
-      const validationResult = await validateFolderFilesSimple(files);
+      const validationResult = await validateFolderFilesWithTotalSize(files);
 
       if (!validationResult.proceed) {
         uploadFolderInput.value = "";
@@ -1265,36 +1265,34 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Fungsi validasi file folder - VERSI SIMPLE
-  async function validateFolderFilesSimple(files) {
+  // Fungsi validasi file folder - DENGAN TOTAL SIZE CHECK
+  async function validateFolderFilesWithTotalSize(files) {
     const validFiles = [];
     const invalidFiles = [];
 
-    // Cek apakah ada file > 50MB
-    const oversizedFiles = files.filter((file) => file.size > MAX_FILE_SIZE);
+    // 1. Hitung TOTAL ukuran semua file dalam folder
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    const totalSizeMB = totalSize / 1024 / 1024;
+    const maxSizeMB = MAX_FILE_SIZE / 1024 / 1024;
 
-    // Jika ada file > 50MB, tampilkan error dan BATALKAN
-    if (oversizedFiles.length > 0) {
-      const maxSizeMB = MAX_FILE_SIZE / 1024 / 1024;
-      const oversizedList = oversizedFiles
-        .slice(0, 5)
-        .map((f) => `• ${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`)
-        .join("<br>");
+    console.log(`📊 Total ukuran folder: ${totalSizeMB.toFixed(2)} MB`);
 
-      const moreText =
-        oversizedFiles.length > 5
-          ? `<br>...dan ${oversizedFiles.length - 5} file lainnya`
-          : "";
-
+    // 2. CEK TOTAL UKURAN FOLDER > 50MB
+    if (totalSize > MAX_FILE_SIZE) {
       await Swal.fire({
-        title: "❌ File Terlalu Besar",
+        title: "❌ Folder Terlalu Besar",
         html: `<div style="text-align: left;">
-               <p><strong>${oversizedFiles.length} file melebihi batas ${maxSizeMB} MB:</strong></p>
-               <div style="max-height: 150px; overflow-y: auto; background: #fee; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 13px;">
-                 ${oversizedList}${moreText}
+               <p><strong>Total ukuran folder melebihi batas ${maxSizeMB} MB:</strong></p>
+               <div style="background: #fee; padding: 15px; border-radius: 5px; margin: 10px 0; text-align: center;">
+                 <div style="font-size: 24px; font-weight: bold; color: #dc3545;">
+                   ${totalSizeMB.toFixed(2)} MB
+                 </div>
+                 <div style="font-size: 14px; color: #666;">
+                   dari ${files.length} file
+                 </div>
                </div>
                <p><strong>Upload tidak dapat dilanjutkan.</strong></p>
-               <p>Hapus file > ${maxSizeMB} MB dari folder dan coba lagi.</p>
+               <p>Kurangi jumlah file atau pilih folder dengan total ukuran ≤ ${maxSizeMB} MB.</p>
              </div>`,
         icon: "error",
         confirmButtonColor: "#dc3545",
@@ -1302,17 +1300,32 @@ document.addEventListener("DOMContentLoaded", () => {
         width: "500px",
       });
 
-      return { proceed: false };
+      return { proceed: false, reason: "total_size_exceeded" };
     }
 
-    // Validasi ekstensi untuk file yang tersisa
+    // 3. Validasi per file (ekstensi dan ukuran individual)
     files.forEach((file) => {
-      const validation = isValidFileExtension(file.name);
-
-      if (!validation.valid) {
+      // Validasi ekstensi
+      const extensionValidation = isValidFileExtension(file.name);
+      if (!extensionValidation.valid) {
         invalidFiles.push({
           name: file.name,
-          reason: validation.message,
+          reason: extensionValidation.message,
+          type: "extension",
+        });
+        return;
+      }
+
+      // Validasi ukuran per file (masih perlu, untuk file > 50MB individual)
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push({
+          name: file.name,
+          reason: `Ukuran file terlalu besar (${(
+            file.size /
+            1024 /
+            1024
+          ).toFixed(2)} MB)`,
+          type: "oversize",
         });
         return;
       }
@@ -1320,26 +1333,55 @@ document.addEventListener("DOMContentLoaded", () => {
       validFiles.push(file);
     });
 
-    // Jika ada file dengan ekstensi tidak valid, tampilkan konfirmasi
+    // 4. Jika ada file dengan ekstensi tidak valid, tampilkan konfirmasi
     if (invalidFiles.length > 0) {
-      const invalidList = invalidFiles
-        .slice(0, 8)
-        .map((f, i) => `${i + 1}. ${f.name}`)
-        .join("<br>");
+      // Pisahkan file dengan ekstensi tidak valid vs ukuran terlalu besar
+      const extensionInvalid = invalidFiles.filter(
+        (f) => f.type === "extension"
+      );
+      const oversizeInvalid = invalidFiles.filter((f) => f.type === "oversize");
 
-      const moreText =
-        invalidFiles.length > 8
-          ? `<br>...dan ${invalidFiles.length - 8} file lainnya`
-          : "";
+      let message = "";
+
+      if (extensionInvalid.length > 0) {
+        const invalidList = extensionInvalid
+          .slice(0, 5)
+          .map((f, i) => `${i + 1}. ${f.name}`)
+          .join("<br>");
+
+        const moreText =
+          extensionInvalid.length > 5
+            ? `<br>...dan ${extensionInvalid.length - 5} file lainnya`
+            : "";
+
+        message += `<p><strong>${extensionInvalid.length} file ekstensi tidak diizinkan:</strong></p>
+                  <div style="max-height: 120px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 12px;">
+                    ${invalidList}${moreText}
+                  </div>`;
+      }
+
+      if (oversizeInvalid.length > 0) {
+        const oversizeList = oversizeInvalid
+          .slice(0, 3)
+          .map((f) => `• ${f.name} (${f.reason})`)
+          .join("<br>");
+
+        const moreOversize =
+          oversizeInvalid.length > 3
+            ? `<br>...dan ${oversizeInvalid.length - 3} file lainnya`
+            : "";
+
+        message += `<p><strong>${oversizeInvalid.length} file ukuran terlalu besar:</strong></p>
+                  <div style="max-height: 100px; overflow-y: auto; background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 12px;">
+                    ${oversizeList}${moreOversize}
+                  </div>`;
+      }
 
       const result = await Swal.fire({
-        title: "⚠️ File Ekstensi Tidak Valid",
+        title: "⚠️ File Tidak Valid",
         html: `<div style="text-align: left;">
-               <p><strong>${invalidFiles.length} file memiliki ekstensi tidak diizinkan:</strong></p>
-               <div style="max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 12px;">
-                 ${invalidList}${moreText}
-               </div>
-               <p><strong>File ini tidak akan diupload.</strong></p>
+               ${message}
+               <p>File-file di atas <strong>tidak akan diupload</strong>.</p>
                <p>Lanjutkan upload <strong>${validFiles.length} file</strong> yang valid?</p>
              </div>`,
         icon: "warning",
@@ -1361,16 +1403,26 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Jika tidak ada file yang valid sama sekali
+    // 5. Jika tidak ada file yang valid sama sekali
     if (validFiles.length === 0) {
       await showError("Tidak ada file yang valid untuk diupload!");
       return { proceed: false };
     }
 
+    // 6. Hitung ulang total size file yang valid (setelah filtering)
+    const validTotalSize = validFiles.reduce((sum, file) => sum + file.size, 0);
+    const validTotalSizeMB = validTotalSize / 1024 / 1024;
+
+    console.log(
+      `📊 Total ukuran file valid: ${validTotalSizeMB.toFixed(2)} MB`
+    );
+
     return {
       proceed: true,
       validFiles,
       invalidFiles,
+      totalSizeMB: totalSizeMB,
+      validTotalSizeMB: validTotalSizeMB,
     };
   }
 
@@ -1555,11 +1607,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // Tampilkan progress container
     const progressContainer = showUploadProgressFolder();
 
-    console.log(`🚀 Memulai upload ${total} file`);
+    console.log(
+      `🚀 Memulai upload ${total} file (total: ${(
+        files.reduce((s, f) => s + f.size, 0) /
+        1024 /
+        1024
+      ).toFixed(2)} MB)`
+    );
 
-    // Proses setiap file secara berurutan (tidak parallel untuk lebih sederhana)
+    // Proses setiap file secara berurutan
     files.forEach((file, index) => {
-      // Delay sedikit antara setiap file untuk menghindari overload
+      // Delay sedikit antara setiap file
       setTimeout(async () => {
         try {
           // Dapatkan struktur folder dari webkitRelativePath
@@ -1568,7 +1626,13 @@ document.addEventListener("DOMContentLoaded", () => {
             .split("/")
             .filter((part) => part.trim() !== "");
 
-          console.log(`📄 [${index + 1}/${total}] Processing: ${relativePath}`);
+          console.log(
+            `📄 [${index + 1}/${total}] Processing: ${relativePath} (${(
+              file.size /
+              1024 /
+              1024
+            ).toFixed(2)} MB)`
+          );
 
           // Update progress
           updateUploadProgress(progressContainer, completed, total, file.name);
@@ -1606,7 +1670,12 @@ document.addEventListener("DOMContentLoaded", () => {
               optimizedStorageUpdate();
 
               const successCount = uploadResults.length;
-              showUploadResultSimple(successCount, total);
+              const totalSizeMB = (
+                files.reduce((s, f) => s + f.size, 0) /
+                1024 /
+                1024
+              ).toFixed(2);
+              showUploadResultWithSize(successCount, total, totalSizeMB);
 
               // Refresh tampilan
               loadFiles(currentParentId);
@@ -1617,30 +1686,55 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Fungsi untuk menampilkan hasil upload - SIMPLE
-  function showUploadResultSimple(successCount, total) {
+  // Fungsi untuk menampilkan hasil upload dengan info size
+  function showUploadResultWithSize(successCount, total, totalSizeMB) {
+    const failedCount = total - successCount;
+
     if (successCount === total) {
-      showSuccess(`🎉 Semua ${total} file berhasil diupload!`);
-    } else if (successCount > 0) {
       Swal.fire({
         icon: "success",
-        title: "Upload Selesai",
+        title: "🎉 Upload Berhasil!",
+        html: `<div style="text-align: left;">
+               <p><strong>Semua file berhasil diupload:</strong></p>
+               <div style="background: #e7f5ff; padding: 12px; border-radius: 5px; margin: 10px 0; text-align: center;">
+                 <div style="font-size: 20px; font-weight: bold; color: #0d6efd;">
+                   ${total} file
+                 </div>
+                 <div style="font-size: 14px; color: #666;">
+                   Total ukuran: ${totalSizeMB} MB
+                 </div>
+               </div>
+             </div>`,
+        confirmButtonColor: "#4a6cf7",
+        confirmButtonText: "OK",
+        width: "400px",
+      });
+    } else if (successCount > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Upload Sebagian Berhasil",
         html: `<div style="text-align: left;">
                <p><strong>📊 Hasil Upload:</strong></p>
-               <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                 <div style="color: #28a745; margin-bottom: 5px;">✅ <strong>Berhasil:</strong> ${successCount} file</div>
-                 <div style="color: #dc3545;">❌ <strong>Gagal:</strong> ${
-                   total - successCount
-                 } file</div>
+               <div style="background: #f8f9fa; padding: 12px; border-radius: 5px; margin: 10px 0;">
+                 <div style="color: #28a745; margin-bottom: 8px;">
+                   ✅ <strong>Berhasil:</strong> ${successCount} file
+                 </div>
+                 <div style="color: #dc3545; margin-bottom: 8px;">
+                   ❌ <strong>Gagal:</strong> ${failedCount} file
+                 </div>
+                 <div style="color: #6c757d;">
+                   📦 <strong>Total:</strong> ${total} file (${totalSizeMB} MB)
+                 </div>
                </div>
-               <p><small>Total file diproses: ${total}</small></p>
              </div>`,
         confirmButtonColor: "#4a6cf7",
         confirmButtonText: "OK",
         width: "400px",
       });
     } else {
-      showError("❌ Tidak ada file yang berhasil diupload!");
+      showError(
+        `❌ Tidak ada file yang berhasil diupload! (${total} file, ${totalSizeMB} MB)`
+      );
     }
   }
 
