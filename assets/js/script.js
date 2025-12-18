@@ -979,16 +979,20 @@ document.addEventListener("DOMContentLoaded", () => {
       // ========== VALIDASI EKSTENSI ==========
       const validation = isValidFileExtension(file.name);
       if (!validation.valid) {
-        alert(validation.message);
-        uploadFileInput.value = "";
+        showError(validation.message).then(() => {
+          uploadFileInput.value = "";
+        });
         return;
       }
       // =======================================
 
       // validasi ukuran
       if (file.size > MAX_FILE_SIZE) {
-        alert(`File terlalu besar! Maksimal ${MAX_FILE_SIZE / 1024 / 1024} MB`);
-        uploadFileInput.value = "";
+        showError(
+          `File terlalu besar! Maksimal ${MAX_FILE_SIZE / 1024 / 1024} MB`
+        ).then(() => {
+          uploadFileInput.value = "";
+        });
         return;
       }
 
@@ -1029,6 +1033,95 @@ document.addEventListener("DOMContentLoaded", () => {
     "createFolderConfirmBtn"
   );
 
+  // Fungsi validasi nama folder
+  function validateFolderName(folderName) {
+    // Hapus spasi di awal dan akhir
+    const trimmedName = folderName.trim();
+
+    // Cek tidak kosong
+    if (!trimmedName) {
+      return {
+        valid: false,
+        message: "Nama folder tidak boleh kosong!",
+      };
+    }
+
+    // Cek panjang nama
+    if (trimmedName.length > 100) {
+      return {
+        valid: false,
+        message: "Nama folder terlalu panjang (maksimal 100 karakter)!",
+      };
+    }
+
+    // Cek karakter yang tidak diizinkan
+    const invalidChars = /[<>:"/\\|?*\x00-\x1F]/;
+    if (invalidChars.test(trimmedName)) {
+      return {
+        valid: false,
+        message:
+          'Nama folder mengandung karakter yang tidak diizinkan!<br>Karakter yang tidak diizinkan: &lt; &gt; : " / \\ | ? *',
+      };
+    }
+
+    // Cek nama reserved (Windows)
+    const reservedNames = [
+      "CON",
+      "PRN",
+      "AUX",
+      "NUL",
+      "COM1",
+      "COM2",
+      "COM3",
+      "COM4",
+      "COM5",
+      "COM6",
+      "COM7",
+      "COM8",
+      "COM9",
+      "LPT1",
+      "LPT2",
+      "LPT3",
+      "LPT4",
+      "LPT5",
+      "LPT6",
+      "LPT7",
+      "LPT8",
+      "LPT9",
+    ];
+
+    const upperName = trimmedName.toUpperCase();
+    if (reservedNames.includes(upperName)) {
+      return {
+        valid: false,
+        message: `"${trimmedName}" adalah nama reserved sistem!`,
+      };
+    }
+
+    // Cek titik di akhir
+    if (trimmedName.endsWith(".")) {
+      return {
+        valid: false,
+        message: "Nama folder tidak boleh diakhiri dengan titik!",
+      };
+    }
+
+    // Cek spasi di akhir
+    if (folderName !== trimmedName) {
+      return {
+        valid: false,
+        message: "Nama folder tidak boleh diawali atau diakhiri dengan spasi!",
+      };
+    }
+
+    return {
+      valid: true,
+      message: "",
+      cleanName: trimmedName,
+    };
+  }
+
+  // Event listener untuk klik create folder button
   if (createFolderBtn) {
     createFolderBtn.addEventListener("click", () => {
       uploadDropdown.style.display = "none";
@@ -1037,6 +1130,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Event listener untuk cancel button
   if (cancelFolderBtn) {
     cancelFolderBtn.addEventListener("click", () => {
       folderModal.style.display = "none";
@@ -1044,24 +1138,39 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Event listener untuk Enter key pada input folder
+  if (folderNameInput) {
+    folderNameInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        createFolderConfirmBtn.click();
+      }
+    });
+  }
+
+  // Event listener untuk create folder confirm button
   if (createFolderConfirmBtn) {
     createFolderConfirmBtn.addEventListener("click", () => {
-      const folderName = folderNameInput.value.trim();
+      const folderName = folderNameInput.value;
 
-      if (!folderName) {
-        alert("Nama folder tidak boleh kosong!");
+      // Validasi nama folder
+      const validation = validateFolderName(folderName);
+      if (!validation.valid) {
+        showError(validation.message);
         return;
       }
 
+      const cleanFolderName = validation.cleanName;
+
       // Cek apakah folder sudah ada di parent yang sama
-      checkFolderExists(folderName, currentParentId).then((exists) => {
+      checkFolderExists(cleanFolderName, currentParentId).then((exists) => {
         if (exists) {
-          alert(`Folder "${folderName}" sudah ada di lokasi ini!`);
+          showError(`Folder "${cleanFolderName}" sudah ada di lokasi ini!`);
           return;
         }
 
         // Jika tidak ada, buat folder
-        createFolder(folderName);
+        createFolder(cleanFolderName);
       });
     });
   }
@@ -1109,21 +1218,15 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Create folder response:", data);
         if (data.success && data.folder) {
           addFileToTable(data.folder);
-          showNotification(
-            `Folder "${folderName}" berhasil dibuat!`,
-            "success"
-          );
+          showSuccess(`Folder "${folderName}" berhasil dibuat!`);
           loadFiles(currentParentId);
         } else {
-          showNotification(
-            "Gagal membuat folder: " + (data.message || "Unknown error"),
-            "error"
-          );
+          showError(data.message || "Gagal membuat folder!");
         }
       })
       .catch((err) => {
         console.error("Error:", err);
-        showNotification("Terjadi error: " + err.message, "error");
+        showError("Terjadi error saat membuat folder: " + err.message);
       });
   }
 
@@ -1149,9 +1252,102 @@ document.addEventListener("DOMContentLoaded", () => {
 
       uploadDropdown.style.display = "none";
 
-      // Process files with folder structure
-      processFolderUpload(files, currentParentId);
+      // Validasi semua file sebelum proses
+      const validationResult = validateFolderFiles(files);
+
+      if (!validationResult.proceed) {
+        uploadFolderInput.value = "";
+        return;
+      }
+
+      // Process files with folder structure (menggunakan fungsi yang sudah ada)
+      processFolderUpload(validationResult.validFiles, currentParentId);
     });
+  }
+
+  // Fungsi validasi file folder
+  function validateFolderFiles(files) {
+    const validFiles = [];
+    const invalidFiles = [];
+
+    files.forEach((file) => {
+      const validation = isValidFileExtension(file.name);
+
+      if (!validation.valid) {
+        invalidFiles.push({
+          name: file.name,
+          reason: validation.message,
+        });
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push({
+          name: file.name,
+          reason: `Ukuran file terlalu besar (maksimal ${
+            MAX_FILE_SIZE / 1024 / 1024
+          } MB)`,
+        });
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    // Tampilkan peringatan jika ada file yang tidak valid
+    if (invalidFiles.length > 0) {
+      const message =
+        `⚠️ ${invalidFiles.length} file tidak dapat diproses:\n\n` +
+        invalidFiles
+          .slice(0, 5)
+          .map((f) => `• ${f.name}`)
+          .join("\n");
+
+      const moreText =
+        invalidFiles.length > 5
+          ? `\n...dan ${invalidFiles.length - 5} file lainnya`
+          : "";
+
+      // Gunakan SweetAlert2 untuk konfirmasi
+      Swal.fire({
+        title: "File Tidak Valid Ditemukan",
+        html: `${invalidFiles.length} file tidak dapat diproses:<br><br>
+             <small>${message}${moreText}</small><br><br>
+             <strong>Lanjutkan upload ${validFiles.length} file yang valid?</strong>`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#4a6cf7",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "Ya, Lanjutkan",
+        cancelButtonText: "Batalkan",
+        customClass: {
+          popup: "custom-swal-popup",
+        },
+      }).then((result) => {
+        if (result.isConfirmed) {
+          if (validFiles.length === 0) {
+            showError("Tidak ada file yang valid untuk diupload!");
+            uploadFolderInput.value = "";
+            return { proceed: false };
+          }
+          return { proceed: true, validFiles, invalidFiles };
+        } else {
+          uploadFolderInput.value = "";
+          return { proceed: false };
+        }
+      });
+    }
+
+    if (validFiles.length === 0) {
+      showError("Tidak ada file yang valid untuk diupload!");
+      return { proceed: false };
+    }
+
+    return {
+      proceed: true,
+      validFiles,
+      invalidFiles,
+    };
   }
 
   // Fungsi helper untuk get folder by name
@@ -1326,68 +1522,25 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
 
-  // Fungsi untuk proses upload folder dengan struktur
+  // Fungsi untuk proses upload folder dengan struktur - TETAP SAMA
   function processFolderUpload(files, parentId = 0) {
     let completed = 0;
     const total = files.length;
     const uploadResults = [];
 
-    // Filter file yang valid
-    const validFiles = [];
-    const invalidFiles = [];
-
-    files.forEach((file) => {
-      const validation = isValidFileExtension(file.name);
-
-      if (!validation.valid) {
-        invalidFiles.push({
-          name: file.name,
-          reason: validation.message,
-        });
-        return;
-      }
-
-      if (file.size > MAX_FILE_SIZE) {
-        invalidFiles.push({
-          name: file.name,
-          reason: `Ukuran file terlalu besar (maksimal ${
-            MAX_FILE_SIZE / 1024 / 1024
-          } MB)`,
-        });
-        return;
-      }
-
-      validFiles.push(file);
-    });
-
-    // Tampilkan peringatan jika ada file yang tidak valid
-    if (invalidFiles.length > 0) {
-      const message =
-        `⚠️ ${invalidFiles.length} file tidak dapat diproses:\n\n` +
-        invalidFiles.map((f) => `• ${f.name}: ${f.reason}`).join("\n");
-
-      if (validFiles.length === 0) {
-        alert(message + "\n\nTidak ada file yang valid untuk diupload.");
-        uploadFolderInput.value = "";
-        return;
-      }
-
-      if (!confirm(message + "\n\nLanjutkan upload hanya file yang valid?")) {
-        uploadFolderInput.value = "";
-        return;
-      }
-    }
-
-    const validTotal = validFiles.length;
-
-    // Tampilkan progress container
+    // Tampilkan progress container (gunakan fungsi yang sudah ada)
     const progressContainer = showUploadProgressFolder();
 
-    console.log(
-      `🚀 Memulai upload ${validTotal} file ke parent ID: ${parentId}`
-    );
+    console.log(`🚀 Memulai upload ${total} file ke parent ID: ${parentId}`);
 
-    validFiles.forEach((file) => {
+    files.forEach((file) => {
+      if (file.size > MAX_FILE_SIZE) {
+        console.warn(`❌ File "${file.name}" terlalu besar!`);
+        completed++;
+        checkCompletion();
+        return;
+      }
+
       // Dapatkan struktur folder dari webkitRelativePath
       const relativePath = file.webkitRelativePath || file.name;
       const pathParts = relativePath
@@ -1396,8 +1549,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       console.log(`📄 Processing: ${relativePath}, Parts:`, pathParts);
 
-      // Update progress untuk file saat ini
-      updateUploadProgress(progressContainer, completed, validTotal, file.name);
+      // Update progress untuk file saat ini (gunakan fungsi yang sudah ada)
+      updateUploadProgress(progressContainer, completed, total, file.name);
 
       if (pathParts.length > 1) {
         // File berada dalam subfolder
@@ -1437,29 +1590,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function checkCompletion() {
-      // Update progress
-      updateUploadProgress(progressContainer, completed, validTotal);
-      console.log(`📊 Progress: ${completed}/${validTotal} files processed`);
+      // Update progress (gunakan fungsi yang sudah ada)
+      updateUploadProgress(progressContainer, completed, total);
+      console.log(`📊 Progress: ${completed}/${total} files processed`);
 
-      if (completed === validTotal) {
+      if (completed === total) {
         setTimeout(() => {
           hideUploadProgress(progressContainer);
           optimizedStorageUpdate();
 
           const successCount = uploadResults.length;
           console.log(
-            `🎉 Upload selesai! ${successCount}/${validTotal} file berhasil`
+            `🎉 Upload selesai! ${successCount}/${total} file berhasil`
           );
 
-          // Tampilkan summary
-          let summary = `Upload selesai!\n`;
-          summary += `• Berhasil: ${successCount} file\n`;
-          summary += `• Gagal: ${validTotal - successCount} file\n`;
-          if (invalidFiles.length > 0) {
-            summary += `• Ditolak: ${invalidFiles.length} file (ekstensi/ukuran tidak valid)`;
-          }
+          // Tampilkan summary dengan SweetAlert2
+          let successMessage = `Upload selesai!<br><br>`;
+          successMessage += `✅ Berhasil: <strong>${successCount} file</strong><br>`;
+          successMessage += `❌ Gagal: <strong>${
+            total - successCount
+          } file</strong>`;
 
-          showNotification(summary, successCount > 0 ? "success" : "warning");
+          if (successCount > 0) {
+            showSuccess(successMessage);
+          } else {
+            showError("Tidak ada file yang berhasil diupload!");
+          }
 
           uploadFolderInput.value = "";
 
