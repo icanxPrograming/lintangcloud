@@ -159,13 +159,16 @@ $lang = [
 
 /* =====================================
    JIKA USER GANTI BAHASA DARI DROPDOWN
+   (Hanya proses, tidak redirect di sini)
 ===================================== */
-if (isset($_POST['changeLang'])) {
-  $chosen = $_POST['changeLang'];   // id / en
+if (isset($_POST['changeLang']) && !headers_sent()) {
+  $chosen = $_POST['changeLang'];
   $_SESSION['lang'] = $chosen;
   $_SESSION['lang_data'] = $lang[$chosen];
-  // header("Location: index.php?page=pengaturan");
-  exit;
+
+  // Simpan untuk JavaScript redirect
+  $_SESSION['needs_redirect'] = true;
+  $_SESSION['redirect_url'] = 'index.php?page=pengaturan';
 }
 
 /* =====================================
@@ -478,6 +481,32 @@ $tr = $_SESSION['lang_data'] ?? $lang['id'];
 </div>
 
 <script>
+  // Cek jika perlu redirect setelah change language
+  <?php if (isset($_SESSION['needs_redirect']) && $_SESSION['needs_redirect']): ?>
+    window.location.href = '<?= $_SESSION['redirect_url'] ?>';
+    <?php
+    unset($_SESSION['needs_redirect']);
+    unset($_SESSION['redirect_url']);
+    ?>
+  <?php endif; ?>
+
+  // Fungsi untuk ganti bahasa dengan form submit
+  function changeLanguage(lang) {
+    // Buat form dinamis
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = ''; // Submit ke halaman yang sama
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'changeLang';
+    input.value = lang;
+
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   function saveSettings() {
     const name = document.getElementById('inputName').value;
     const email = document.getElementById('inputEmail').value;
