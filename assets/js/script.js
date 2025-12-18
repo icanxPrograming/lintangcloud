@@ -1249,11 +1249,10 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log(
         `📁 Memproses ${files.length} file dengan struktur folder...`
       );
-
       uploadDropdown.style.display = "none";
 
-      // Validasi semua file sebelum proses - MENGGUNAKAN ASYNC/AWAIT
-      const validationResult = await validateFolderFiles(files);
+      // Validasi semua file sebelum proses
+      const validationResult = await validateFolderFilesSimple(files);
 
       if (!validationResult.proceed) {
         uploadFolderInput.value = "";
@@ -1261,16 +1260,52 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Process files with folder structure
-      processFolderUpload(validationResult.validFiles, currentParentId);
+      processFolderUploadSimple(validationResult.validFiles, currentParentId);
+      uploadFolderInput.value = "";
     });
   }
 
-  // Fungsi validasi file folder - DIUBAH MENJADI ASYNC
-  async function validateFolderFiles(files) {
+  // Fungsi validasi file folder - VERSI SIMPLE
+  async function validateFolderFilesSimple(files) {
     const validFiles = [];
     const invalidFiles = [];
 
-    // Validasi setiap file
+    // Cek apakah ada file > 50MB
+    const oversizedFiles = files.filter((file) => file.size > MAX_FILE_SIZE);
+
+    // Jika ada file > 50MB, tampilkan error dan BATALKAN
+    if (oversizedFiles.length > 0) {
+      const maxSizeMB = MAX_FILE_SIZE / 1024 / 1024;
+      const oversizedList = oversizedFiles
+        .slice(0, 5)
+        .map((f) => `• ${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`)
+        .join("<br>");
+
+      const moreText =
+        oversizedFiles.length > 5
+          ? `<br>...dan ${oversizedFiles.length - 5} file lainnya`
+          : "";
+
+      await Swal.fire({
+        title: "❌ File Terlalu Besar",
+        html: `<div style="text-align: left;">
+               <p><strong>${oversizedFiles.length} file melebihi batas ${maxSizeMB} MB:</strong></p>
+               <div style="max-height: 150px; overflow-y: auto; background: #fee; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 13px;">
+                 ${oversizedList}${moreText}
+               </div>
+               <p><strong>Upload tidak dapat dilanjutkan.</strong></p>
+               <p>Hapus file > ${maxSizeMB} MB dari folder dan coba lagi.</p>
+             </div>`,
+        icon: "error",
+        confirmButtonColor: "#dc3545",
+        confirmButtonText: "OK",
+        width: "500px",
+      });
+
+      return { proceed: false };
+    }
+
+    // Validasi ekstensi untuk file yang tersisa
     files.forEach((file) => {
       const validation = isValidFileExtension(file.name);
 
@@ -1282,42 +1317,30 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (file.size > MAX_FILE_SIZE) {
-        invalidFiles.push({
-          name: file.name,
-          reason: `Ukuran file terlalu besar (maksimal ${
-            MAX_FILE_SIZE / 1024 / 1024
-          } MB)`,
-        });
-        return;
-      }
-
       validFiles.push(file);
     });
 
-    // Jika ada file yang tidak valid, tampilkan konfirmasi SWEETALERT2
+    // Jika ada file dengan ekstensi tidak valid, tampilkan konfirmasi
     if (invalidFiles.length > 0) {
-      // Buat list file yang tidak valid (maksimal 10 file)
       const invalidList = invalidFiles
-        .slice(0, 10)
+        .slice(0, 8)
         .map((f, i) => `${i + 1}. ${f.name}`)
         .join("<br>");
 
       const moreText =
-        invalidFiles.length > 10
-          ? `<br>...dan ${invalidFiles.length - 10} file lainnya`
+        invalidFiles.length > 8
+          ? `<br>...dan ${invalidFiles.length - 8} file lainnya`
           : "";
 
-      // Tampilkan SweetAlert2 dan TUNGGU KONFIRMASI USER
       const result = await Swal.fire({
-        title: "⚠️ File Tidak Valid Ditemukan",
+        title: "⚠️ File Ekstensi Tidak Valid",
         html: `<div style="text-align: left;">
-               <p><strong>${invalidFiles.length} dari ${files.length} file tidak dapat diproses:</strong></p>
-               <div style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 13px;">
+               <p><strong>${invalidFiles.length} file memiliki ekstensi tidak diizinkan:</strong></p>
+               <div style="max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 12px;">
                  ${invalidList}${moreText}
                </div>
-               <p>File ditolak karena: <strong>ekstensi tidak diizinkan atau ukuran terlalu besar</strong>.</p>
-               <p><strong>Lanjutkan upload ${validFiles.length} file yang valid?</strong></p>
+               <p><strong>File ini tidak akan diupload.</strong></p>
+               <p>Lanjutkan upload <strong>${validFiles.length} file</strong> yang valid?</p>
              </div>`,
         icon: "warning",
         showCancelButton: true,
@@ -1325,41 +1348,23 @@ document.addEventListener("DOMContentLoaded", () => {
         cancelButtonColor: "#6c757d",
         confirmButtonText: "Ya, Lanjutkan",
         cancelButtonText: "Batalkan",
-        width: "600px",
-        customClass: {
-          popup: "custom-swal-popup",
-          htmlContainer: "text-left",
-        },
+        width: "500px",
       });
 
-      // Jika user membatalkan
       if (!result.isConfirmed) {
-        return {
-          proceed: false,
-          validFiles: [],
-          invalidFiles,
-        };
+        return { proceed: false, validFiles: [], invalidFiles };
       }
 
-      // Jika tidak ada file yang valid setelah konfirmasi
       if (validFiles.length === 0) {
         await showError("Tidak ada file yang valid untuk diupload!");
-        return {
-          proceed: false,
-          validFiles: [],
-          invalidFiles,
-        };
+        return { proceed: false };
       }
     }
 
-    // Jika tidak ada file yang valid sama sekali (tanpa konfirmasi)
+    // Jika tidak ada file yang valid sama sekali
     if (validFiles.length === 0) {
       await showError("Tidak ada file yang valid untuk diupload!");
-      return {
-        proceed: false,
-        validFiles: [],
-        invalidFiles,
-      };
+      return { proceed: false };
     }
 
     return {
@@ -1541,107 +1546,101 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
 
-  // Fungsi untuk proses upload folder dengan struktur - TETAP SAMA
-  function processFolderUpload(files, parentId = 0) {
+  // Fungsi untuk proses upload folder dengan struktur - VERSI SIMPLE
+  function processFolderUploadSimple(files, parentId = 0) {
     let completed = 0;
     const total = files.length;
     const uploadResults = [];
 
-    // Tampilkan progress container (gunakan fungsi yang sudah ada)
+    // Tampilkan progress container
     const progressContainer = showUploadProgressFolder();
 
-    console.log(`🚀 Memulai upload ${total} file ke parent ID: ${parentId}`);
+    console.log(`🚀 Memulai upload ${total} file`);
 
-    files.forEach((file) => {
-      if (file.size > MAX_FILE_SIZE) {
-        console.warn(`❌ File "${file.name}" terlalu besar!`);
-        completed++;
-        checkCompletion();
-        return;
-      }
+    // Proses setiap file secara berurutan (tidak parallel untuk lebih sederhana)
+    files.forEach((file, index) => {
+      // Delay sedikit antara setiap file untuk menghindari overload
+      setTimeout(async () => {
+        try {
+          // Dapatkan struktur folder dari webkitRelativePath
+          const relativePath = file.webkitRelativePath || file.name;
+          const pathParts = relativePath
+            .split("/")
+            .filter((part) => part.trim() !== "");
 
-      // Dapatkan struktur folder dari webkitRelativePath
-      const relativePath = file.webkitRelativePath || file.name;
-      const pathParts = relativePath
-        .split("/")
-        .filter((part) => part.trim() !== "");
+          console.log(`📄 [${index + 1}/${total}] Processing: ${relativePath}`);
 
-      console.log(`📄 Processing: ${relativePath}, Parts:`, pathParts);
+          // Update progress
+          updateUploadProgress(progressContainer, completed, total, file.name);
 
-      // Update progress untuk file saat ini (gunakan fungsi yang sudah ada)
-      updateUploadProgress(progressContainer, completed, total, file.name);
+          let result = null;
 
-      if (pathParts.length > 1) {
-        // File berada dalam subfolder
-        processFileWithFolderStructure(file, pathParts, parentId)
-          .then((result) => {
-            if (result) {
-              uploadResults.push(result);
-              console.log(`✅ Berhasil upload: ${file.name}`);
-            } else {
-              console.warn(`⚠️ Gagal upload: ${file.name}`);
-            }
-          })
-          .catch((error) => {
-            console.error(`❌ Error upload ${file.name}:`, error);
-          })
-          .finally(() => {
-            completed++;
-            checkCompletion();
-          });
-      } else {
-        // File langsung di root folder
-        uploadFileToParent(file, parentId)
-          .then((result) => {
-            if (result) {
-              uploadResults.push(result);
-              console.log(`✅ Berhasil upload: ${file.name}`);
-            }
-          })
-          .catch((error) => {
-            console.error(`❌ Error upload ${file.name}:`, error);
-          })
-          .finally(() => {
-            completed++;
-            checkCompletion();
-          });
-      }
-    });
-
-    function checkCompletion() {
-      // Update progress (gunakan fungsi yang sudah ada)
-      updateUploadProgress(progressContainer, completed, total);
-      console.log(`📊 Progress: ${completed}/${total} files processed`);
-
-      if (completed === total) {
-        setTimeout(() => {
-          hideUploadProgress(progressContainer);
-          optimizedStorageUpdate();
-
-          const successCount = uploadResults.length;
-          console.log(
-            `🎉 Upload selesai! ${successCount}/${total} file berhasil`
-          );
-
-          // Tampilkan summary dengan SweetAlert2
-          let successMessage = `Upload selesai!<br><br>`;
-          successMessage += `✅ Berhasil: <strong>${successCount} file</strong><br>`;
-          successMessage += `❌ Gagal: <strong>${
-            total - successCount
-          } file</strong>`;
-
-          if (successCount > 0) {
-            showSuccess(successMessage);
+          if (pathParts.length > 1) {
+            // File berada dalam subfolder
+            result = await processFileWithFolderStructure(
+              file,
+              pathParts,
+              parentId
+            );
           } else {
-            showError("Tidak ada file yang berhasil diupload!");
+            // File langsung di root folder
+            result = await uploadFileToParent(file, parentId);
           }
 
-          uploadFolderInput.value = "";
+          if (result) {
+            uploadResults.push(result);
+            console.log(`✅ Berhasil: ${file.name}`);
+          } else {
+            console.warn(`⚠️ Gagal: ${file.name}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error: ${file.name}`, error.message);
+        } finally {
+          completed++;
+          updateUploadProgress(progressContainer, completed, total);
 
-          // Refresh tampilan
-          loadFiles(currentParentId);
-        }, 1000);
-      }
+          // Cek jika semua sudah selesai
+          if (completed === total) {
+            setTimeout(() => {
+              hideUploadProgress(progressContainer);
+              optimizedStorageUpdate();
+
+              const successCount = uploadResults.length;
+              showUploadResultSimple(successCount, total);
+
+              // Refresh tampilan
+              loadFiles(currentParentId);
+            }, 500);
+          }
+        }
+      }, index * 100); // Delay 100ms antara setiap file
+    });
+  }
+
+  // Fungsi untuk menampilkan hasil upload - SIMPLE
+  function showUploadResultSimple(successCount, total) {
+    if (successCount === total) {
+      showSuccess(`🎉 Semua ${total} file berhasil diupload!`);
+    } else if (successCount > 0) {
+      Swal.fire({
+        icon: "success",
+        title: "Upload Selesai",
+        html: `<div style="text-align: left;">
+               <p><strong>📊 Hasil Upload:</strong></p>
+               <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                 <div style="color: #28a745; margin-bottom: 5px;">✅ <strong>Berhasil:</strong> ${successCount} file</div>
+                 <div style="color: #dc3545;">❌ <strong>Gagal:</strong> ${
+                   total - successCount
+                 } file</div>
+               </div>
+               <p><small>Total file diproses: ${total}</small></p>
+             </div>`,
+        confirmButtonColor: "#4a6cf7",
+        confirmButtonText: "OK",
+        width: "400px",
+      });
+    } else {
+      showError("❌ Tidak ada file yang berhasil diupload!");
     }
   }
 
